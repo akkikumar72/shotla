@@ -1,0 +1,17 @@
+---
+description: "High-level overview of the Next.js project structure."
+alwaysApply: true
+---
+
+# Project Structure Guide
+
+This is a Next.js project using the App Router.
+
+- **`app/`**: Contains all the routes, pages, and layouts. The main entry point is [`app/layout.tsx`](mdc:app/layout.tsx) and [`app/page.tsx`](mdc:app/page.tsx).
+- **`components/`**: Shared and reusable React components.
+  - **`components/ui/`**: UI components from shadcn/ui. These are generally not meant to be modified directly but can be customized.
+- **`constants/`**: Holds constant values used across the application, like in [`constants/backgrounds.ts`](mdc:constants/backgrounds.ts).
+- **`hooks/`**: Custom React hooks are stored here.
+- **`lib/`**: Utility functions. See [`lib/utils.ts`](mdc:lib/utils.ts).
+- **`public/`**: Static assets like images and fonts.
+- **`styles/`**: Global stylesheets.

@@ -1,0 +1,10 @@
+# Styling Guide
+
+This project uses Tailwind CSS for styling and the Outfit font from Google Fonts. Please follow these conventions:
+
+- **Font Family**: The primary font is Outfit, which is loaded via Next.js Google Fonts and available as `font-outfit` or `font-sans` in Tailwind classes.
+- **Utility-First**: Use Tailwind's utility classes directly in your JSX for styling.
+- **Component-Based Styling**: Co-locate component-specific styles with the component file. For shared styles, consider creating a new component or a custom hook.
+- **`clsx` and `tailwind-merge`**: When conditionally applying classes, use the `clsx` library. To resolve conflicting styles, use `tailwind-merge`. The `cn` utility in [`lib/utils.ts`](mdc:lib/utils.ts) combines both. Always use `cn()` when building class strings.
+- **Global Styles**: Global styles are defined in [`app/globals.css`](mdc:app/globals.css). The Outfit font is configured here and should not be changed.
+- **Theme**: Theme customizations are in `tailwind.config.js`. The Outfit font family is defined here for use throughout the application.

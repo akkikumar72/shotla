@@ -23,8 +23,3 @@ In this codebase, always use Bun as the runtime and toolchain. Do not use Node.j
 - Prefer `Bun.file` for file operations over `node:fs`.
 - Use Bun's shell syntax (`Bun.$\`command\``) instead of `execa`.
 
-## Testing
-
-All tests must use `bun test`. Example:
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.

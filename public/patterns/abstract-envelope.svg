@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <defs>
+    <pattern id="abstract-envelope" x="0" y="0" width="120" height="120" patternUnits="userSpaceOnUse">
+      <rect width="120" height="120" fill="#1e293b"/>
+      <g stroke="#3b82f6" stroke-width="1.5" fill="none" opacity="0.6">
+        <!-- Envelope shapes -->
+        <path d="M20 30 L50 50 L80 30 L80 60 L20 60 Z"/>
+        <path d="M20 30 L50 50 L80 30"/>
+        <path d="M70 80 L100 100 L130 80 L130 110 L70 110 Z"/>
+        <path d="M70 80 L100 100 L130 80"/>
+        <path d="-30 80 L0 100 L30 80 L30 110 L-30 110 Z"/>
+        <path d="-30 80 L0 100 L30 80"/>
+      </g>
+      <g stroke="#8b5cf6" stroke-width="1" fill="none" opacity="0.4">
+        <!-- Secondary envelope layer -->
+        <path d="M45 5 L75 25 L105 5 L105 35 L45 35 Z"/>
+        <path d="M45 5 L75 25 L105 5"/>
+        <path d="M95 55 L125 75 L155 55 L155 85 L95 85 Z"/>
+        <path d="M95 55 L125 75 L155 55"/>
+        <path d="-5 55 L25 75 L55 55 L55 85 L-5 85 Z"/>
+        <path d="-5 55 L25 75 L55 55"/>
+      </g>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#abstract-envelope)"/>
+</svg>

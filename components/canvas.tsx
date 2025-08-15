@@ -35,7 +35,11 @@ interface CanvasProps {
   onCropChange: (crop: CropArea) => void;
   onCropDoubleClick: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
-  getBackgroundStyle: (background: string) => string;
+  canvasContainerRef: React.RefObject<HTMLDivElement | null>;
+  getBackgroundStyle: (background: string) => {
+    type: "css" | "tailwind";
+    value: string;
+  };
   getShadowStyle: (shadow: string) => string;
 }
 
@@ -63,159 +67,178 @@ export const Canvas = ({
   onCropChange,
   onCropDoubleClick,
   fileInputRef,
+  canvasContainerRef,
   getBackgroundStyle,
   getShadowStyle,
-}: CanvasProps) => (
-  <div className="w-full h-full flex items-center justify-center p-8">
-    <div
-      className="rounded-lg relative flex-shrink-0"
-      style={{
-        width: `${canvasSize.width}px`,
-        height: `${canvasSize.height}px`,
-        maxWidth: "calc(100vw - 400px)", // Account for sidebar width
-        maxHeight: "calc(100vh - 200px)", // Account for header and footer
-        borderRadius: `${canvasCorners}px`,
-        background: `
-          radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0),
-          #1a1a1a
-        `,
-        backgroundSize: "20px 20px",
-        filter: advancedSettings.backgroundNoise
-          ? "contrast(1.1) brightness(0.95)"
-          : "none",
-        overflow: "hidden",
-      }}
-    >
-      {!uploadedImage ? (
-        <div
-          className={`w-full h-full flex flex-col items-center justify-center border-2 border-dashed transition-all duration-200 cursor-pointer ${
-            isDragging
-              ? "border-white/40 bg-white/5"
-              : "border-white/20 hover:border-white/30 hover:bg-white/5"
-          }`}
-          style={{
-            borderRadius: `${canvasCorners}px`, // Applied canvas corners to upload area
-            margin: `${padding}px`, // Applied padding to upload area
-            width: `calc(100% - ${padding * 2}px)`,
-            height: `calc(100% - ${padding * 2}px)`,
-          }}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload className="w-12 h-12 text-white/60 mb-4" />
-          <p className="text-white/80 text-lg font-medium">
-            Click to upload or drag and drop screenshots
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={onFileSelect}
-            className="hidden"
-          />
-        </div>
-      ) : (
-        <div
-          className={`rounded-lg flex items-center justify-center relative overflow-hidden ${getBackgroundStyle(
-            selectedBackground
-          )}`}
-          style={{
-            margin: `${padding}px`, // Applied padding around content
-            width: `calc(100% - ${padding * 2}px)`,
-            height: `calc(100% - ${padding * 2}px)`,
-            borderRadius: `${Math.max(0, canvasCorners - padding)}px`, // Adjusted inner radius
-          }}
-        >
-          {isCropping && (
-            <div className="absolute inset-0 z-50">
-              <CropOverlay
-                imageElement={null}
-                imageSrc={uploadedImage}
-                onCropChange={onCropChange}
-                onDoubleClick={onCropDoubleClick}
-              />
-            </div>
-          )}
-
+}: CanvasProps) => {
+  return (
+    <div className="w-full h-full flex items-center justify-center p-4">
+      <div
+        ref={canvasContainerRef}
+        className="rounded-lg relative flex-shrink-0"
+        style={{
+          width: `${canvasSize.width}px`,
+          height: `${canvasSize.height}px`,
+          maxWidth: "calc(100vw - 400px)",
+          maxHeight: "calc(100vh - 180px)",
+          borderRadius: `${canvasCorners}px`,
+          background: `
+            radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0),
+            #1a1a1a
+          `,
+          backgroundSize: "20px 20px",
+          filter: advancedSettings.backgroundNoise
+            ? "contrast(1.1) brightness(0.95)"
+            : "none",
+          overflow: "hidden",
+        }}
+      >
+        {!uploadedImage ? (
           <div
-            className="relative w-full h-full flex items-center justify-center"
+            className={`w-full h-full flex flex-col items-center justify-center border-2 border-dashed transition-all duration-200 cursor-pointer ${
+              isDragging
+                ? "border-white/40 bg-white/5"
+                : "border-white/20 hover:border-white/30 hover:bg-white/5"
+            }`}
             style={{
-              transform: `scale(${
-                advancedSettings.windowScale / 100
-              }) translate(${advancedSettings.horizontalOffset}%, ${
-                advancedSettings.verticalOffset
-              }%)`,
+              borderRadius: `${canvasCorners}px`,
+              margin: `${padding}px`,
+              width: `calc(100% - ${padding * 2}px)`,
+              height: `calc(100% - ${padding * 2}px)`,
+            }}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="w-12 h-12 text-white/60 mb-4" />
+            <p className="text-white/80 text-lg font-medium">
+              Click to upload or drag and drop screenshots
+            </p>
+          </div>
+        ) : (
+          <div
+            className="w-full h-full relative"
+            style={{
+              borderRadius: `${canvasCorners}px`,
+              background:
+                getBackgroundStyle(selectedBackground).type === "css"
+                  ? getBackgroundStyle(selectedBackground).value
+                  : undefined,
+              overflow: "hidden",
             }}
           >
+            {/* Apply Tailwind background if it's a Tailwind class */}
+            {getBackgroundStyle(selectedBackground).type === "tailwind" && (
+              <div
+                className={`w-full h-full ${
+                  getBackgroundStyle(selectedBackground).value
+                }`}
+              />
+            )}
+
+            {/* Content area with padding */}
             <div
-              className={`relative ${getShadowStyle("medium")}`}
+              className="absolute inset-0 flex items-center justify-center"
               style={{
-                borderRadius: `${advancedSettings.frameCorners}px`,
-                border: advancedSettings.border
-                  ? `${advancedSettings.borderWidth}px solid ${advancedSettings.borderColor}`
-                  : "none",
-                boxShadow: `0 ${advancedSettings.windowShadow}px ${
-                  advancedSettings.windowShadow * 2
-                }px rgba(0,0,0,0.3)`,
+                margin: `${padding}px`,
+                width: `calc(100% - ${padding * 2}px)`,
+                height: `calc(100% - ${padding * 2}px)`,
+                borderRadius: `${Math.max(0, canvasCorners - padding)}px`,
+                overflow: "hidden",
               }}
             >
-              {advancedSettings.windowHeader !== "none" && (
-                <div
-                  className={`h-8 flex items-center px-4 ${
-                    advancedSettings.windowHeader === "dark"
-                      ? "bg-gray-800"
-                      : "bg-gray-100"
-                  }`}
-                  style={{
-                    borderTopLeftRadius: `${advancedSettings.frameCorners}px`,
-                    borderTopRightRadius: `${advancedSettings.frameCorners}px`,
-                  }}
-                >
-                  <div className="flex space-x-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  </div>
+              {isCropping && (
+                <div className="absolute inset-0 z-50">
+                  <CropOverlay
+                    imageElement={null}
+                    imageSrc={uploadedImage}
+                    onCropChange={onCropChange}
+                    onDoubleClick={onCropDoubleClick}
+                  />
                 </div>
               )}
 
-              <div className="relative overflow-hidden">
-                {!isCropping && (
-                  <div
-                    className="flex items-center justify-center"
-                    style={{
-                      transform: fitToImage
-                        ? "none"
-                        : `scale(${
-                            imageScale / 100
-                          }) translate(${imageHorizontalOffset}%, ${imageVerticalOffset}%)`,
-                      transition: "transform 0.2s ease-out",
-                    }}
-                  >
-                    <img
-                      src={uploadedImage || "/placeholder.svg"}
-                      alt="Uploaded screenshot"
-                      className={
-                        fitToImage
-                          ? "w-full h-full object-contain"
-                          : "max-w-full max-h-full"
-                      }
+              <div
+                className="relative w-full h-full flex items-center justify-center"
+                style={{
+                  transform: `scale(${
+                    advancedSettings.windowScale / 100
+                  }) translate(${advancedSettings.horizontalOffset}%, ${
+                    advancedSettings.verticalOffset
+                  }%)`,
+                }}
+              >
+                <div
+                  className={`relative ${getShadowStyle("medium")}`}
+                  style={{
+                    borderRadius: `${advancedSettings.frameCorners}px`,
+                    border: advancedSettings.border
+                      ? `${advancedSettings.borderWidth}px solid ${advancedSettings.borderColor}`
+                      : "none",
+                    boxShadow: `0 ${advancedSettings.windowShadow}px ${
+                      advancedSettings.windowShadow * 2
+                    }px rgba(0,0,0,0.3)`,
+                  }}
+                >
+                  {advancedSettings.windowHeader !== "none" && (
+                    <div
+                      className={`h-8 flex items-center px-4 ${
+                        advancedSettings.windowHeader === "dark"
+                          ? "bg-gray-800"
+                          : "bg-gray-100"
+                      }`}
                       style={{
-                        borderRadius: fitToImage
-                          ? advancedSettings.windowHeader !== "none"
-                            ? `0 0 ${advancedSettings.frameCorners}px ${advancedSettings.frameCorners}px`
-                            : `${advancedSettings.frameCorners}px`
-                          : `${imageCornerRadius}px`,
-                        transition: "all 0.2s ease-out",
+                        borderTopLeftRadius: `${advancedSettings.frameCorners}px`,
+                        borderTopRightRadius: `${advancedSettings.frameCorners}px`,
                       }}
-                    />
+                    >
+                      <div className="flex space-x-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="relative overflow-hidden">
+                    {!isCropping && (
+                      <div
+                        className="flex items-center justify-center"
+                        style={{
+                          transform: fitToImage
+                            ? "none"
+                            : `scale(${
+                                imageScale / 100
+                              }) translate(${imageHorizontalOffset}%, ${imageVerticalOffset}%)`,
+                          transition: "transform 0.2s ease-out",
+                        }}
+                      >
+                        <img
+                          src={uploadedImage || "/placeholder.svg"}
+                          alt="Uploaded screenshot"
+                          className={
+                            fitToImage
+                              ? "w-full h-full object-contain"
+                              : "max-w-full max-h-full"
+                          }
+                          style={{
+                            borderRadius: fitToImage
+                              ? advancedSettings.windowHeader !== "none"
+                                ? `0 0 ${advancedSettings.frameCorners}px ${advancedSettings.frameCorners}px`
+                                : `${advancedSettings.frameCorners}px`
+                              : `${imageCornerRadius}px`,
+                            transition: "all 0.2s ease-out",
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
 
+            {/* Text overlays positioned relative to the entire canvas */}
             {!isCropping &&
               textOverlays.map((overlay) => (
                 <div
@@ -241,11 +264,15 @@ export const Canvas = ({
                       ? "right-4"
                       : "left-1/2 -translate-x-1/2"
                   }`}
+                  style={{
+                    margin: `${padding}px`,
+                  }}
                 >
                   {overlay.text}
                 </div>
               ))}
 
+            {/* Magnifiers positioned relative to the entire canvas */}
             {!isCropping &&
               magnifiers.map((magnifier) => (
                 <div
@@ -283,11 +310,14 @@ export const Canvas = ({
                       ? "bottom-4 right-4"
                       : "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
                   }`}
+                  style={{
+                    margin: `${padding}px`,
+                  }}
                 />
               ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};

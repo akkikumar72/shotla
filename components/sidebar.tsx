@@ -1,51 +1,53 @@
-"use client"
+"use client";
 
-import { Header } from "./header"
-import { CropControls } from "./crop-controls"
-import { BackgroundThemeSelector } from "./background-theme-selector"
-import { WindowControls } from "./window-controls"
-import { BorderControls } from "./border-controls"
-import { CanvasControls } from "./canvas-controls"
-import { EnhancementControls } from "./enhancement-controls"
-import { ExportControls } from "./export-controls"
-import { CustomToggle } from "./ui/custom-toggle"
-import { Button } from "@/components/ui/button"
-import type { AdvancedSettings } from "@/types"
+import { Header } from "./header";
+import { CropControls } from "./crop-controls";
+import { BackgroundThemeSelector } from "./background-theme-selector";
+import { WindowControls } from "./window-controls";
+import { BorderControls } from "./border-controls";
+import { CanvasControls } from "./canvas-controls";
+import { EnhancementControls } from "./enhancement-controls";
+import { ExportControls } from "./export-controls";
+import { CustomToggle } from "./ui/custom-toggle";
+import { Button } from "@/components/ui/button";
+import type { AdvancedSettings } from "@/types";
 
 interface SidebarProps {
-  uploadedImage: string | null
-  selectedBackground: string
-  setSelectedBackground: (background: string) => void
-  advancedSettings: AdvancedSettings
-  updateAdvancedSetting: (key: keyof AdvancedSettings, value: any) => void
-  isCropping: boolean
-  onStartCrop: () => void
-  onApplyCrop: () => void
-  onCancelCrop: () => void
-  addMagnifier: () => void
-  addTextLayer: () => void
-  exportImage: () => void
-  fitToImage: boolean
-  setFitToImage: (value: boolean) => void
-  canvasSize: { width: number; height: number }
-  setCanvasSize: (size: { width: number; height: number }) => void
-  canvasScale: number // Added canvas scale prop
-  setCanvasScale: (scale: number) => void // Added canvas scale setter prop
-  aspectRatio: string
-  setAspectRatio: (ratio: string) => void
-  padding: number
-  setPadding: (value: number) => void
-  canvasCorners: number
-  setCanvasCorners: (value: number) => void
-  imageScale: number
-  setImageScale: (value: number) => void
-  imageHorizontalOffset: number
-  setImageHorizontalOffset: (value: number) => void
-  imageVerticalOffset: number
-  setImageVerticalOffset: (value: number) => void
-  imageCornerRadius: number
-  setImageCornerRadius: (value: number) => void
-  onResetImageControls: () => void
+  uploadedImage: string | null;
+  selectedBackground: string;
+  setSelectedBackground: (background: string) => void;
+  advancedSettings: AdvancedSettings;
+  updateAdvancedSetting: (key: keyof AdvancedSettings, value: any) => void;
+  isCropping: boolean;
+  onStartCrop: () => void;
+  onApplyCrop: () => void;
+  onCancelCrop: () => void;
+  addMagnifier: () => void;
+  addTextLayer: () => void;
+  exportImage: () => void;
+  fitToImage: boolean;
+  setFitToImage: (value: boolean) => void;
+  canvasSize: { width: number; height: number };
+  setCanvasSize: (size: { width: number; height: number }) => void;
+  canvasScale: number; // Added canvas scale prop
+  setCanvasScale: (scale: number) => void; // Added canvas scale setter prop
+  aspectRatio: string;
+  setAspectRatio: (ratio: string) => void;
+  padding: number;
+  setPadding: (value: number) => void;
+  canvasCorners: number;
+  setCanvasCorners: (value: number) => void;
+  imageScale: number;
+  setImageScale: (value: number) => void;
+  imageHorizontalOffset: number;
+  setImageHorizontalOffset: (value: number) => void;
+  imageVerticalOffset: number;
+  setImageVerticalOffset: (value: number) => void;
+  imageCornerRadius: number;
+  setImageCornerRadius: (value: number) => void;
+  onResetImageControls: () => void;
+  autoStyleWithAI: () => Promise<void>;
+  isAutoStyling: boolean;
 }
 
 export const Sidebar = ({
@@ -82,20 +84,35 @@ export const Sidebar = ({
   imageCornerRadius,
   setImageCornerRadius,
   onResetImageControls,
+  autoStyleWithAI,
+  isAutoStyling,
 }: SidebarProps) => (
   <div className="w-80 bg-gray-900 border-l border-gray-800 flex flex-col h-full">
     <div className="p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
       <Header />
 
       <div className="flex space-x-1 bg-gray-800 rounded-lg p-1">
-        <Button className="flex-1 bg-gray-700 text-white text-sm py-2">Editor</Button>
+        <Button className="flex-1 bg-gray-700 text-white text-sm py-2">
+          Editor
+        </Button>
         <Button variant="ghost" className="flex-1 text-gray-400 text-sm py-2">
           Advertising
         </Button>
       </div>
 
-      <Button className="w-full bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-medium">
-        ✨ Auto-Style with AI
+      <Button
+        className="w-full bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        onClick={autoStyleWithAI}
+        disabled={!uploadedImage || isAutoStyling}
+      >
+        {isAutoStyling ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            Generating Style...
+          </>
+        ) : (
+          "✨ Auto-Style with AI"
+        )}
       </Button>
 
       <CropControls
@@ -133,18 +150,32 @@ export const Sidebar = ({
       <CustomToggle
         label="Background Noise"
         checked={advancedSettings.backgroundNoise}
-        onChange={(checked) => updateAdvancedSetting("backgroundNoise", checked)}
+        onChange={(checked) =>
+          updateAdvancedSetting("backgroundNoise", checked)
+        }
       />
 
-      <WindowControls advancedSettings={advancedSettings} updateAdvancedSetting={updateAdvancedSetting} />
+      <WindowControls
+        advancedSettings={advancedSettings}
+        updateAdvancedSetting={updateAdvancedSetting}
+      />
 
-      <BorderControls advancedSettings={advancedSettings} updateAdvancedSetting={updateAdvancedSetting} />
+      <BorderControls
+        advancedSettings={advancedSettings}
+        updateAdvancedSetting={updateAdvancedSetting}
+      />
 
-      <BackgroundThemeSelector selectedBackground={selectedBackground} setSelectedBackground={setSelectedBackground} />
+      <BackgroundThemeSelector
+        selectedBackground={selectedBackground}
+        setSelectedBackground={setSelectedBackground}
+      />
 
-      <EnhancementControls addMagnifier={addMagnifier} addTextLayer={addTextLayer} />
+      <EnhancementControls
+        addMagnifier={addMagnifier}
+        addTextLayer={addTextLayer}
+      />
 
       <ExportControls exportImage={exportImage} />
     </div>
   </div>
-)
+);

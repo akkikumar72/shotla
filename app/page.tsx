@@ -39,6 +39,7 @@ export default function ShotlaEditor() {
               onCropChange={editor.onCropChange}
               onCropDoubleClick={editor.onCropDoubleClick}
               fileInputRef={editor.fileInputRef}
+              canvasContainerRef={editor.canvasContainerRef}
               getBackgroundStyle={editor.getBackgroundStyle}
               getShadowStyle={editor.getShadowStyle}
             />
@@ -50,6 +51,7 @@ export default function ShotlaEditor() {
             onAddScreenshots={editor.addMoreScreenshots}
             onSwitchScreenshot={editor.switchToScreenshot}
             onRemoveScreenshot={editor.removeScreenshot}
+            canAddMore={editor.canAddMore}
           />
         </div>
 
@@ -87,8 +89,20 @@ export default function ShotlaEditor() {
           imageCornerRadius={editor.imageCornerRadius}
           setImageCornerRadius={editor.setImageCornerRadius}
           onResetImageControls={editor.onResetImageControls}
+          autoStyleWithAI={editor.autoStyleWithAI}
+          isAutoStyling={editor.isAutoStyling}
         />
       </div>
+
+      {/* Persistent hidden file input for adding screenshots from anywhere */}
+      <input
+        ref={editor.fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={editor.onFileSelect}
+        className="hidden"
+      />
 
       <canvas ref={editor.canvasRef} className="hidden" />
     </div>

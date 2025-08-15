@@ -18,12 +18,12 @@ export const CropControls = ({ hasImage, isCropping, onStartCrop, onApplyCrop, o
 
     {!isCropping ? (
       <Button
-        variant="outline"
-        className="w-full text-gray-300 border-gray-700 hover:bg-gray-800 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+        styleType="ghost"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={onStartCrop}
         disabled={!hasImage}
       >
-        <Crop className="w-4 h-4 mr-2" />
+        <Crop className="w-4 h-4" />
         Crop
       </Button>
     ) : (
@@ -32,17 +32,21 @@ export const CropControls = ({ hasImage, isCropping, onStartCrop, onApplyCrop, o
           Drag the crop area and resize using the corner handles. Double-click to apply.
         </p>
 
-        <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={onApplyCrop}>
-          <Check className="w-4 h-4 mr-2" />
+        <Button 
+          styleType="success"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3" 
+          onClick={onApplyCrop}
+        >
+          <Check className="w-4 h-4" />
           Apply
         </Button>
 
         <Button
-          variant="outline"
-          className="w-full text-gray-300 border-gray-700 hover:bg-gray-800 bg-transparent"
+          styleType="ghost"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3"
           onClick={onCancelCrop}
         >
-          <X className="w-4 h-4 mr-2" />
+          <X className="w-4 h-4" />
           Cancel
         </Button>
       </div>

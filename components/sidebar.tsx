@@ -92,22 +92,29 @@ export const Sidebar = ({
       <Header />
 
       <div className="flex space-x-1 bg-gray-800 rounded-lg p-1">
-        <Button className="flex-1 bg-gray-700 text-white text-sm py-2">
+        <Button 
+          styleType="secondary"
+          className="flex-1 text-sm py-2"
+        >
           Editor
         </Button>
-        <Button variant="ghost" className="flex-1 text-gray-400 text-sm py-2">
+        <Button 
+          styleType="ghost"
+          className="flex-1 text-sm py-2"
+        >
           Advertising
         </Button>
       </div>
 
       <Button
-        className="w-full bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        styleType="warning"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={autoStyleWithAI}
         disabled={!uploadedImage || isAutoStyling}
       >
         {isAutoStyling ? (
           <>
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
             Generating Style...
           </>
         ) : (

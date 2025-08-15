@@ -9,12 +9,19 @@ interface ExportControlsProps {
 
 export const ExportControls = ({ exportImage }: ExportControlsProps) => (
   <div className="pt-4 border-t border-gray-800 space-y-3">
-    <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium">
-      <Upload className="w-4 h-4 mr-2" />
+    <Button 
+      styleType="primary"
+      className="w-full flex items-center justify-center gap-2 px-4 py-3"
+    >
+      <Upload className="w-4 h-4" />
       Host on Picstatic
     </Button>
-    <Button onClick={exportImage} className="w-full bg-white text-black hover:bg-gray-100 font-medium">
-      <Download className="w-4 h-4 mr-2" />
+    <Button 
+      onClick={exportImage} 
+      styleType="secondary"
+      className="w-full flex items-center justify-center gap-2 px-4 py-3"
+    >
+      <Download className="w-4 h-4" />
       Export Image
     </Button>
   </div>

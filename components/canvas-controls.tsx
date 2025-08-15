@@ -91,11 +91,11 @@ export const CanvasControls = ({
 
           <Button
             onClick={onResetImageControls}
-            variant="outline"
+            styleType="ghost"
             size="sm"
-            className="w-full bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2"
           >
-            <RotateCcw className="w-4 h-4 mr-2" />
+            <RotateCcw className="w-4 h-4" />
             Reset
           </Button>
         </div>
@@ -139,9 +139,9 @@ export const CanvasControls = ({
           {["Auto", "16:9", "4:3", "1:1", "9:16"].map((ratio) => (
             <Button
               key={ratio}
-              variant={aspectRatio === ratio ? "default" : "ghost"}
+              styleType={aspectRatio === ratio ? "secondary" : "ghost"}
               size="sm"
-              className="text-gray-500 hover:text-gray-300 px-2 py-1 h-auto"
+              className="px-2 py-1 h-auto text-xs"
               onClick={() => setAspectRatio(ratio)}
             >
               {ratio}

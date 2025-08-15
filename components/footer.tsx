@@ -31,9 +31,9 @@ export const Footer = ({
       <div className="flex items-center space-x-4">
         <Button
           onClick={onAddScreenshots}
-          variant="outline"
-          size="sm"
-          className="h-16 w-16 border-2 border-dashed border-gray-600 hover:border-gray-500 bg-transparent text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          styleType="ghost"
+          size="lg"
+          className="h-16 w-16 border-2 border-dashed border-gray-600 hover:border-gray-500 bg-transparent text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           disabled={!canAddMore}
           title={canAddMore ? "Add screenshots" : "Limit reached (10)"}
         >

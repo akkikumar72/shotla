@@ -33,7 +33,7 @@ curl -fsSL https://bun.sh/install | bash
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/shotla.git
+   git clone [https://github.com/yourusername/shotla.git](https://github.com/akkikumar72/shotla/)
    cd shotla
    ```
 
@@ -138,5 +138,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <div align="center">
-  Made with ❤️ by @akkikumar
+  Made with ❤️ by [@akkikumar](https://github.com/akkikumar72)
 </div>

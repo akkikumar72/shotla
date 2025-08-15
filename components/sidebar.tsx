@@ -10,6 +10,7 @@ import { EnhancementControls } from "./enhancement-controls";
 import { ExportControls } from "./export-controls";
 import { CustomToggle } from "./ui/custom-toggle";
 import { Button } from "@/components/ui/button";
+import { ProfessionalButton } from "@/components/ui/professional-button";
 import type { AdvancedSettings } from "@/types";
 
 interface SidebarProps {
@@ -92,35 +93,24 @@ export const Sidebar = ({
       <Header />
 
       <div className="flex space-x-1 bg-gray-800 rounded-lg p-1">
-        <Button 
-          styleType="secondary"
-          className="flex-1 text-sm py-2"
-        >
+        <Button className="flex-1 bg-gray-700 text-white text-sm py-2">
           Editor
         </Button>
-        <Button 
-          styleType="ghost"
-          className="flex-1 text-sm py-2"
-        >
+        {/* <Button variant="ghost" className="flex-1 text-gray-400 text-sm py-2">
           Advertising
-        </Button>
+        </Button> */}
       </div>
 
-      <Button
-        styleType="warning"
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+      <ProfessionalButton
+        variant="warning"
+        size="md"
+        className="w-full"
         onClick={autoStyleWithAI}
         disabled={!uploadedImage || isAutoStyling}
+        loading={isAutoStyling}
       >
-        {isAutoStyling ? (
-          <>
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            Generating Style...
-          </>
-        ) : (
-          "✨ Auto-Style with AI"
-        )}
-      </Button>
+        ✨ Auto-Style with AI
+      </ProfessionalButton>
 
       <CropControls
         hasImage={!!uploadedImage}

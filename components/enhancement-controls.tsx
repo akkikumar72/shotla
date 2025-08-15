@@ -1,38 +1,42 @@
-"use client"
+"use client";
 
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { Plus, Type } from "lucide-react"
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 interface EnhancementControlsProps {
-  addMagnifier: () => void
-  addTextLayer: () => void
+  addMagnifier: () => void;
+  addTextLayer: () => void;
 }
 
-export const EnhancementControls = ({ addMagnifier, addTextLayer }: EnhancementControlsProps) => (
+export const EnhancementControls = ({
+  addMagnifier,
+  addTextLayer,
+}: EnhancementControlsProps) => (
   <>
     <div>
-      <Label className="text-sm font-medium text-gray-300 mb-3 block">Enhancements</Label>
+      <Label className="text-sm font-medium text-gray-300 mb-3 block">
+        Enhancements
+      </Label>
       <Button
         onClick={addMagnifier}
-        styleType="ghost"
-        className="w-full flex items-center justify-center gap-2 px-4 py-3"
+        variant="outline"
+        className="w-full text-gray-300 border-gray-700 hover:bg-gray-800 bg-transparent"
       >
-        <Plus className="w-4 h-4" />
         Add Magnifier
       </Button>
     </div>
 
     <div>
-      <Label className="text-sm font-medium text-gray-300 mb-3 block">Text Layers</Label>
+      <Label className="text-sm font-medium text-gray-300 mb-3 block">
+        Text Layers
+      </Label>
       <Button
         onClick={addTextLayer}
-        styleType="ghost"
-        className="w-full flex items-center justify-center gap-2 px-4 py-3"
+        variant="outline"
+        className="w-full text-gray-300 border-gray-700 hover:bg-gray-800 bg-transparent"
       >
-        <Type className="w-4 h-4" />
         Add Text Layer
       </Button>
     </div>
   </>
-)
+);

@@ -1,28 +1,30 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Upload, Download } from "lucide-react"
+import { ProfessionalButton } from "@/components/ui/professional-button";
+import { Upload, Download } from "lucide-react";
 
 interface ExportControlsProps {
-  exportImage: () => void
+  exportImage: () => void;
 }
 
 export const ExportControls = ({ exportImage }: ExportControlsProps) => (
   <div className="pt-4 border-t border-gray-800 space-y-3">
-    <Button 
-      styleType="primary"
-      className="w-full flex items-center justify-center gap-2 px-4 py-3"
+    <ProfessionalButton
+      variant="primary"
+      size="md"
+      className="w-full"
+      leftIcon={<Upload className="w-4 h-4" />}
     >
-      <Upload className="w-4 h-4" />
       Host on Picstatic
-    </Button>
-    <Button 
-      onClick={exportImage} 
-      styleType="secondary"
-      className="w-full flex items-center justify-center gap-2 px-4 py-3"
+    </ProfessionalButton>
+    <ProfessionalButton
+      variant="secondary"
+      size="md"
+      className="w-full"
+      onClick={exportImage}
+      leftIcon={<Download className="w-4 h-4" />}
     >
-      <Download className="w-4 h-4" />
       Export Image
-    </Button>
+    </ProfessionalButton>
   </div>
-)
+);

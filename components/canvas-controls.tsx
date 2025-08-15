@@ -1,34 +1,34 @@
-"use client"
+"use client";
 
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { CustomToggle } from "./ui/custom-toggle"
-import { CustomSlider } from "./ui/custom-slider"
-import { RotateCcw } from "lucide-react"
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { CustomToggle } from "./ui/custom-toggle";
+import { CustomSlider } from "./ui/custom-slider";
+import { RotateCcw } from "lucide-react";
 
 interface CanvasControlsProps {
-  fitToImage: boolean
-  setFitToImage: (value: boolean) => void
-  canvasSize: { width: number; height: number }
-  setCanvasSize: (size: { width: number; height: number }) => void
-  canvasScale: number // Added canvas scale prop
-  setCanvasScale: (scale: number) => void // Added canvas scale setter prop
-  aspectRatio: string
-  setAspectRatio: (ratio: string) => void
-  padding: number
-  setPadding: (value: number) => void
-  canvasCorners: number
-  setCanvasCorners: (value: number) => void
-  imageScale: number
-  setImageScale: (value: number) => void
-  imageHorizontalOffset: number
-  setImageHorizontalOffset: (value: number) => void
-  imageVerticalOffset: number
-  setImageVerticalOffset: (value: number) => void
-  imageCornerRadius: number
-  setImageCornerRadius: (value: number) => void
-  onResetImageControls: () => void
+  fitToImage: boolean;
+  setFitToImage: (value: boolean) => void;
+  canvasSize: { width: number; height: number };
+  setCanvasSize: (size: { width: number; height: number }) => void;
+  canvasScale: number; // Added canvas scale prop
+  setCanvasScale: (scale: number) => void; // Added canvas scale setter prop
+  aspectRatio: string;
+  setAspectRatio: (ratio: string) => void;
+  padding: number;
+  setPadding: (value: number) => void;
+  canvasCorners: number;
+  setCanvasCorners: (value: number) => void;
+  imageScale: number;
+  setImageScale: (value: number) => void;
+  imageHorizontalOffset: number;
+  setImageHorizontalOffset: (value: number) => void;
+  imageVerticalOffset: number;
+  setImageVerticalOffset: (value: number) => void;
+  imageCornerRadius: number;
+  setImageCornerRadius: (value: number) => void;
+  onResetImageControls: () => void;
 }
 
 export const CanvasControls = ({
@@ -55,13 +55,26 @@ export const CanvasControls = ({
   onResetImageControls,
 }: CanvasControlsProps) => (
   <div>
-    <Label className="text-sm font-medium text-gray-300 mb-3 block">Canvas</Label>
+    <Label className="text-sm font-medium text-gray-300 mb-3 block">
+      Canvas
+    </Label>
     <div className="space-y-4">
-      <CustomToggle label="Fit to Image" checked={fitToImage} onChange={setFitToImage} />
+      <CustomToggle
+        label="Fit to Image"
+        checked={fitToImage}
+        onChange={setFitToImage}
+      />
 
       {!fitToImage && (
         <div className="space-y-4">
-          <CustomSlider label="Image Scale" value={imageScale} onChange={setImageScale} min={10} max={200} unit="%" />
+          <CustomSlider
+            label="Image Scale"
+            value={imageScale}
+            onChange={setImageScale}
+            min={10}
+            max={200}
+            unit="%"
+          />
 
           <CustomSlider
             label="Horizontal Offset"
@@ -91,11 +104,11 @@ export const CanvasControls = ({
 
           <Button
             onClick={onResetImageControls}
-            styleType="ghost"
+            variant="outline"
             size="sm"
-            className="w-full flex items-center justify-center gap-2 px-3 py-2"
+            className="w-full bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-4 h-4 mr-2" />
             Reset
           </Button>
         </div>
@@ -107,14 +120,24 @@ export const CanvasControls = ({
           <Input
             placeholder="W 918"
             value={canvasSize.width}
-            onChange={(e) => setCanvasSize({ ...canvasSize, width: Number.parseInt(e.target.value) || 0 })}
+            onChange={(e) =>
+              setCanvasSize({
+                ...canvasSize,
+                width: Number.parseInt(e.target.value) || 0,
+              })
+            }
             className="bg-gray-800 border-gray-700 text-gray-300 text-sm"
             disabled={fitToImage}
           />
           <Input
             placeholder="H 328"
             value={canvasSize.height}
-            onChange={(e) => setCanvasSize({ ...canvasSize, height: Number.parseInt(e.target.value) || 0 })}
+            onChange={(e) =>
+              setCanvasSize({
+                ...canvasSize,
+                height: Number.parseInt(e.target.value) || 0,
+              })
+            }
             className="bg-gray-800 border-gray-700 text-gray-300 text-sm"
             disabled={fitToImage}
           />
@@ -139,9 +162,9 @@ export const CanvasControls = ({
           {["Auto", "16:9", "4:3", "1:1", "9:16"].map((ratio) => (
             <Button
               key={ratio}
-              styleType={aspectRatio === ratio ? "secondary" : "ghost"}
+              variant={aspectRatio === ratio ? "default" : "ghost"}
               size="sm"
-              className="px-2 py-1 h-auto text-xs"
+              className="text-gray-500 hover:text-gray-300 px-2 py-1 h-auto"
               onClick={() => setAspectRatio(ratio)}
             >
               {ratio}
@@ -150,8 +173,20 @@ export const CanvasControls = ({
         </div>
       </div>
 
-      <CustomSlider label="Padding" value={padding} onChange={setPadding} max={200} unit="px" />
-      <CustomSlider label="Canvas Corners" value={canvasCorners} onChange={setCanvasCorners} max={50} unit="px" />
+      <CustomSlider
+        label="Padding"
+        value={padding}
+        onChange={setPadding}
+        max={200}
+        unit="px"
+      />
+      <CustomSlider
+        label="Canvas Corners"
+        value={canvasCorners}
+        onChange={setCanvasCorners}
+        max={50}
+        unit="px"
+      />
     </div>
   </div>
-)
+);

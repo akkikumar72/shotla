@@ -1,142 +1,105 @@
-# 📸 Shotla
+# Shotla Studio
 
-**Modern Screenshot Editor with AI-Powered Styling**
+Turn screenshots into polished visuals with coordinated presets, backgrounds, frames, crops, and annotations. Shotla keeps the tools in one sidebar and renders the result directly in your browser.
 
-Transform your screenshots into stunning visuals with professional backgrounds, smart cropping, and AI-enhanced styling.
+![Shotla Studio showing the fictional Forma dashboard](docs/images/shotla-studio.png)
 
-![Shotla Demo](SampleEditing.png)
+Built with Next.js 15, React 19, TypeScript, Tailwind CSS 4, and Bun. Manual editing needs no account or API key.
 
-## ✨ Features
+## Run locally
 
-- 🎨 **Beautiful Backgrounds** - 60+ gradient and pattern themes
-- ✂️ **Smart Cropping** - Precise image cropping with live preview
-- 🔍 **Magnifiers** - Highlight important areas with zoom effects
-- 📝 **Text Overlays** - Add custom text with full styling control
-- 🤖 **AI Auto-Styling** - Intelligent background and styling suggestions
-- 🖼️ **Multi-Screenshot** - Manage and edit multiple images
-- ⚙️ **Advanced Controls** - Fine-tune shadows, borders, and spacing
-- 📱 **Responsive Design** - Works seamlessly on all devices
-- 💾 **High-Quality Export** - Export in multiple formats and resolutions
+Install [Bun](https://bun.sh/), then clone and start the project. Local checks and GitHub Actions use Bun 1.3.11.
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-Ensure you have [Bun](https://bun.sh/) installed:
-
-```bash
-curl -fsSL https://bun.sh/install | bash
+```sh
+git clone https://github.com/akkikumar72/shotla.git
+cd shotla
+bun install --frozen-lockfile
+bun run dev
 ```
 
-### Installation
+Open [localhost:3000](http://localhost:3000), upload an image, or select **Try a demo**. To use another port: `bun run dev --port 3100`.
 
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/akkikumar72/shotla
-   cd shotla
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   bun install
-   ```
-
-3. **Start development server**
-
-   ```bash
-   bun run dev
-   ```
-
-4. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-## 🛠️ Tech Stack
-
-- **Framework:** Next.js 14 with App Router
-- **Runtime:** Bun
-- **Styling:** Tailwind CSS + shadcn/ui
-- **Language:** TypeScript
-- **AI Integration:** OpenAI API
-- **Image Processing:** HTML Canvas + html-to-image
-- **Icons:** Lucide React
-
-## 🎯 Usage
-
-### Basic Workflow
-
-1. **Upload Screenshot** - Drag & drop or click to select your image
-2. **Choose Background** - Pick from gradients, patterns, or solid colors
-3. **Adjust & Style** - Use cropping, scaling, and positioning tools
-4. **Add Enhancements** - Insert text, magnifiers, or apply AI styling
-5. **Export** - Download your styled screenshot in high quality
-
-### Key Features
-
-#### 🎨 Background Themes
-
-- **Gradients:** 30+ carefully crafted color combinations
-- **Patterns:** Abstract and geometric SVG patterns
-- **Solid Colors:** Clean, professional single-color backgrounds
-
-#### ✂️ Cropping & Editing
-
-- Interactive crop overlay with precise controls
-- Real-time preview of changes
-- Non-destructive editing workflow
-
-#### 🤖 AI Auto-Styling
-
-- Intelligent background suggestions based on image content
-- Automatic color palette matching
-- Smart layout optimization
-
-## 📦 Scripts
-
-```bash
-# Development
-bun run dev          # Start development server
-bun run build        # Build for production
-bun run start        # Start production server
-
-# Code Quality
-bun run lint         # Run Next.js linter
-bun run typecheck    # TypeScript type checking
-bun run format       # Format code with Biome
-bun run check        # Run all quality checks
+```sh
+bun run check   # TypeScript, scoped lint/format, regression tests, production build
+bun run start  # Serve the production build
 ```
 
-## 🤝 Contributing
+Development uses `.next-dev`; production uses `.next`, so a production build does not overwrite an active development server's output.
 
-We welcome contributions! Here's how to get started:
+## Editing workflow
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Upload, drop, or paste a screenshot. Each image keeps its own edits and undo history.
+2. Choose a preset, then adjust its background, canvas dimensions, and frame.
+3. Crop the image or add a caption and magnifier to highlight a detail.
+4. Choose a filename, format, and resolution. Download the rendered result or copy it as PNG.
 
-### Development Guidelines
+## Workspace
 
-- Use Bun for all package management and script execution
-- Follow the existing TypeScript and React patterns
-- Ensure your code passes all quality checks: `bun run check`
-- Add appropriate tests for new features
+Every editing feature is accessible from the sidebar:
 
-## 📄 License
+| Tool | What it does |
+| --- | --- |
+| Images | Upload, switch, remove, and try a sample. Each image has its own editing state and undo history. |
+| Presets | Six coordinated styles and up to eight named styles saved in this browser. |
+| Background | 51 backgrounds, search, patterns, custom colors/gradients, editable hex values, transparency, grain, and optional AI styling. |
+| Canvas | Natural-size fitting, custom dimensions, aspect ratios, social formats, padding, corners, image transforms, and preview zoom. |
+| Frame | No header or light/dark window headers, shadow, corners, borders that preserve the image area, scale, and position. |
+| Crop | Interactive crop, cancel, and restore original. Cropping is undoable. |
+| Annotate | Editable captions that fit the canvas and magnifiers with actual zoomed image content, seven positions, size, color, and focus controls. |
+| Export | PNG, JPEG, WebP, 1×/2×/3× resolution, file naming, PNG clipboard copy, and a persistent rendered preview with a Download again link. |
+| Help | Workflow, keyboard shortcuts, and storage behavior. |
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Undo and redo are also available in the sidebar footer. On small screens, the settings button shows or hides the inspector so the preview stays accessible.
 
-## 🙏 Acknowledgments
+| Shortcut | Action |
+| --- | --- |
+| Cmd/Ctrl+V | Paste an image |
+| Cmd/Ctrl+Z | Undo |
+| Shift+Cmd/Ctrl+Z | Redo |
+| Escape | Cancel cropping |
 
-- [shadcn/ui](https://ui.shadcn.com/) for the beautiful UI components
-- [Lucide](https://lucide.dev/) for the icon system
-- [Tailwind CSS](https://tailwindcss.com/) for the styling framework
-- [Bun](https://bun.sh/) for the lightning-fast JavaScript runtime
+## Storage and privacy
 
----
+Images remain in the current tab and are **not saved across refreshes**. Export before closing. Only named style settings persist in local storage. There is no cloud upload in the ordinary editing/export flow.
 
-<div align="center">
-  Made with ❤️ by https://github.com/akkikumar72
-</div>
+## Limits
+
+- Up to 10 images, 20 MB per file, and 40 million source pixels per image.
+- PNG, JPG, WebP, GIF, and AVIF imports. Animated formats are flattened to one frame.
+- Custom canvas sides are 100–4096 px. Natural-fit images are scaled down if needed to fit the 4096 px canvas limit.
+- Export resolution is capped at 8192 px per side. JPEG flattens transparency to white.
+- Clipboard image copying needs browser support and a secure context (localhost is supported).
+
+## Optional AI styling
+
+Set `OPENAI_API_KEY` in `.env.local` and restart the server. The sidebar enables AI styling only when the key is configured. Clicking it sends a reduced PNG of the active screenshot to OpenAI; the interface discloses this. The key stays on the server. Manual editing and presets require no key.
+
+Provider-backed generation needs separate testing with a valid key. No AI credentials are included in this repository.
+
+## Development and verification
+
+| Command | Purpose |
+| --- | --- |
+| `bun run dev` | Development server |
+| `bun run build` / `bun run start` | Build and serve production |
+| `bun run typecheck` | TypeScript validation |
+| `bun run lint` / `bun run format:check` | Biome checks for the editor implementation |
+| `bun run format` | Apply Biome formatting and safe fixes |
+| `bun run test` | Geometry, crop, background, and history regressions |
+| `bun run check` | Typecheck, lint, format, tests, and production build |
+
+[GitHub Actions](.github/workflows/quality.yml) runs the frozen-lockfile install and `bun run check` on pull requests and pushes to `master`.
+
+The latest local validation passes **13 regression tests** and a production build. Browser audits exercised all nine sidebar tools, all six presets, all 51 backgrounds, mobile layouts, crop recovery, annotation placement, and PNG/JPEG/WebP at every 1×/2×/3× resolution. Transparency and clipboard output were inspected from decoded image pixels.
+
+- [UI audit](docs/ui-audit.md): original findings, competitor research, and the initial browser checks.
+- [Uploaded-image audit](docs/uploaded-image-audit.md): clipping, color, and grain-export fixes verified with an uploaded image.
+- [Browser audit results](docs/browser-audit-results.json): recorded results from the initial 79 checks.
+
+The Codex in-app browser's native file-save handoff could not be confirmed. Its encoded exports and clipboard PNGs were verified; ordinary Chrome downloads passed the initial audit. AI-provider requests still need separate validation with a configured key.
+
+`scripts/browser-audit.js` is a Playwright CLI `run-code --filename` scenario for the production preview on port 3101. It requires a separate, isolated browser session with an empty workspace and AI unconfigured. See the [reproduction steps](docs/ui-audit.md#reproduce-the-browser-check). Generated exports and screenshots stay under ignored `output/playwright/`; browser automation is not part of the default CI job.
+
+Before opening a pull request, run `bun run check`. For UI changes, also verify the affected controls in a browser at desktop and mobile sizes.
+
+The included Forma dashboard and README preview use original fictional demo content. Uploaded user images and local audit exports are not included in the repository.

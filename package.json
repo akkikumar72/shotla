@@ -1,17 +1,18 @@
 {
-  "name": "my-v0-project",
+  "name": "shotla",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "lint": "next lint",
+    "lint": "biome lint .",
     "start": "next start",
-    "typecheck": "bunx tsc --noEmit",
-    "lint:biome": "bunx --bun @biomejs/biome lint .",
-    "format": "bunx --bun @biomejs/biome check --write .",
-    "format:check": "bunx --bun @biomejs/biome check .",
-    "check": "bun run typecheck && bun run lint:biome && bun run format:check && bun run build"
+    "typecheck": "tsc --noEmit",
+    "lint:biome": "biome lint .",
+    "format": "biome check --write .",
+    "format:check": "biome format .",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run test && bun run build",
+    "test": "bun test ./tests/editor-model.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.12",
@@ -70,6 +71,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.0",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/react": "^19",

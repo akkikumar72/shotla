@@ -1,323 +1,471 @@
 "use client";
+import {
+  ArrowUpRight,
+  Check,
+  ImagePlus,
+  Minus,
+  Plus,
+  Scan,
+  Upload,
+  X,
+} from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import ReactCrop from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
+import type { ShotlaEditor } from "@/hooks/use-shotla-editor";
+import { normalizeBackground } from "@/lib/editor-model";
+import type { TextOverlay } from "@/types";
 
-import type React from "react";
-import { Upload } from "lucide-react";
-import { CropOverlay } from "./crop-overlay";
-import type {
-  TextOverlay,
-  Magnifier,
-  AdvancedSettings,
-  CropArea,
-} from "@/types";
-
-interface CanvasProps {
-  uploadedImage: string | null;
-  selectedBackground: string;
-  selectedShadow: string;
-  textOverlays: TextOverlay[];
-  magnifiers: Magnifier[];
-  advancedSettings: AdvancedSettings;
-  isDragging: boolean;
-  isCropping: boolean;
-  cropArea: CropArea | null;
-  fitToImage: boolean;
-  canvasSize: { width: number; height: number };
-  padding: number; // Added padding prop
-  canvasCorners: number; // Added canvas corners prop
-  imageScale: number;
-  imageHorizontalOffset: number;
-  imageVerticalOffset: number;
-  imageCornerRadius: number;
-  onDrop: (e: React.DragEvent) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDragLeave: () => void;
-  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onCropChange: (crop: CropArea) => void;
-  onCropDoubleClick: () => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  canvasContainerRef: React.RefObject<HTMLDivElement | null>;
-  getBackgroundStyle: (background: string) => {
-    type: "css" | "tailwind";
-    value: string;
+const noise = normalizeBackground(
+  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='.25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+);
+function layerPosition(position: string): React.CSSProperties {
+  const left = position.includes("left");
+  const right = position.includes("right");
+  const top = position.includes("top");
+  const bottom = position.includes("bottom");
+  return {
+    position: "absolute",
+    left: right ? undefined : left ? "8%" : "50%",
+    right: right ? "8%" : undefined,
+    top: bottom ? undefined : top ? "8%" : "50%",
+    bottom: bottom ? "8%" : undefined,
+    transform: `translate(${left || right ? "0" : "-50%"}, ${top || bottom ? "0" : "-50%"})`,
   };
-  getShadowStyle: (shadow: string) => string;
 }
 
-export const Canvas = ({
-  uploadedImage,
-  selectedBackground,
-  textOverlays,
-  magnifiers,
-  advancedSettings,
-  isDragging,
-  isCropping,
-  cropArea,
-  fitToImage,
-  canvasSize,
-  padding, // Added padding prop
-  canvasCorners, // Added canvas corners prop
-  imageScale,
-  imageHorizontalOffset,
-  imageVerticalOffset,
-  imageCornerRadius,
-  onDrop,
-  onDragOver,
-  onDragLeave,
-  onFileSelect,
-  onCropChange,
-  onCropDoubleClick,
-  fileInputRef,
-  canvasContainerRef,
-  getBackgroundStyle,
-  getShadowStyle,
-}: CanvasProps) => {
+function TextLayer({
+  layer,
+  canvas,
+}: {
+  layer: TextOverlay;
+  canvas: { width: number; height: number };
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const requestedSize = { small: 22, medium: 34, large: 52 }[layer.size] ?? 34;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Caption changes alter measured text height.
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    // Fit complete captions inside the safe area, even on a small artboard.
+    let size = requestedSize;
+    node.style.fontSize = `${size}px`;
+    while (
+      (node.scrollHeight > canvas.height * 0.84 ||
+        node.scrollWidth > canvas.width * 0.84) &&
+      size > 1
+    ) {
+      size -= 1;
+      node.style.fontSize = `${size}px`;
+    }
+  }, [requestedSize, layer.text, canvas.width, canvas.height]);
   return (
-    <div className="w-full h-full flex items-center justify-center p-4">
-      <div
-        ref={canvasContainerRef}
-        className="rounded-lg relative flex-shrink-0"
-        style={{
-          width: `${canvasSize.width}px`,
-          height: `${canvasSize.height}px`,
-          maxWidth: "calc(100vw - 400px)",
-          maxHeight: "calc(100vh - 180px)",
-          borderRadius: `${canvasCorners}px`,
-          background: `
-            radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0),
-            #1a1a1a
-          `,
-          backgroundSize: "20px 20px",
-          filter: advancedSettings.backgroundNoise
-            ? "contrast(1.1) brightness(0.95)"
-            : "none",
-          overflow: "hidden",
-        }}
-      >
-        {!uploadedImage ? (
-          <div
-            className={`w-full h-full flex flex-col items-center justify-center border-2 border-dashed transition-all duration-200 cursor-pointer ${
-              isDragging
-                ? "border-white/40 bg-white/5"
-                : "border-white/20 hover:border-white/30 hover:bg-white/5"
-            }`}
-            style={{
-              borderRadius: `${canvasCorners}px`,
-              margin: `${padding}px`,
-              width: `calc(100% - ${padding * 2}px)`,
-              height: `calc(100% - ${padding * 2}px)`,
-            }}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="w-12 h-12 text-white/60 mb-4" />
-            <p className="text-white/80 text-lg font-medium">
-              Click to upload or drag and drop screenshots
-            </p>
-          </div>
-        ) : (
-          <div
-            className="w-full h-full relative"
-            style={{
-              borderRadius: `${canvasCorners}px`,
-              background:
-                getBackgroundStyle(selectedBackground).type === "css"
-                  ? getBackgroundStyle(selectedBackground).value
-                  : undefined,
-              overflow: "hidden",
-            }}
-          >
-            {/* Apply Tailwind background if it's a Tailwind class */}
-            {getBackgroundStyle(selectedBackground).type === "tailwind" && (
-              <div
-                className={`w-full h-full ${
-                  getBackgroundStyle(selectedBackground).value
-                }`}
-              />
-            )}
+    <div
+      ref={ref}
+      data-testid="text-layer"
+      style={{
+        ...layerPosition(layer.position),
+        maxWidth: "84%",
+        width: "max-content",
+        fontFamily: "Arial, sans-serif",
+        fontSize: requestedSize,
+        fontWeight: 600,
+        lineHeight: 1.25,
+        color: layer.color,
+        textAlign: layer.position.includes("left")
+          ? "left"
+          : layer.position.includes("right")
+            ? "right"
+            : "center",
+        whiteSpace: "pre-wrap",
+        overflowWrap: "anywhere",
+        textShadow: "0 2px 10px #182b3050",
+      }}
+    >
+      {layer.text}
+    </div>
+  );
+}
 
-            {/* Content area with padding */}
-            <div
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                margin: `${padding}px`,
-                width: `calc(100% - ${padding * 2}px)`,
-                height: `calc(100% - ${padding * 2}px)`,
-                borderRadius: `${Math.max(0, canvasCorners - padding)}px`,
-                overflow: "hidden",
-              }}
-            >
-              {isCropping && (
-                <div className="absolute inset-0 z-50">
-                  <CropOverlay
-                    imageElement={null}
-                    imageSrc={uploadedImage}
-                    onCropChange={onCropChange}
-                    onDoubleClick={onCropDoubleClick}
-                  />
-                </div>
-              )}
+export function Canvas({ editor: e }: { editor: ShotlaEditor }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState({ width: 900, height: 600 });
+  const zoom = e.previewZoom;
+  const setZoom = e.setPreviewZoom;
+  useEffect(() => {
+    if (!viewportRef.current) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setViewport({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      }),
+    );
+    observer.observe(viewportRef.current);
+    return () => observer.disconnect();
+  }, []);
+  const fitScale = Math.min(
+    (viewport.width - 88) / e.canvasSize.width,
+    (viewport.height - 104) / e.canvasSize.height,
+    1,
+  );
+  const scale = (Math.max(0.02, fitScale) * zoom) / 100;
+  const header = e.advancedSettings.windowHeader === "none" ? 0 : 36;
+  const border = e.advancedSettings.border
+    ? e.advancedSettings.borderWidth * 2
+    : 0;
+  const availableWidth = Math.max(
+    1,
+    e.canvasSize.width - e.padding * 2 - border,
+  );
+  const availableHeight = Math.max(
+    1,
+    e.canvasSize.height - e.padding * 2 - header - border,
+  );
+  const imageFit = Math.min(
+    availableWidth / e.imageSize.width,
+    availableHeight / e.imageSize.height,
+  );
+  const imageWidth = e.imageSize.width * imageFit;
+  const imageHeight = e.imageSize.height * imageFit;
 
-              <div
-                className="relative w-full h-full flex items-center justify-center"
-                style={{
-                  transform: `scale(${
-                    advancedSettings.windowScale / 100
-                  }) translate(${advancedSettings.horizontalOffset}%, ${
-                    advancedSettings.verticalOffset
-                  }%)`,
-                }}
-              >
-                <div
-                  className={`relative ${getShadowStyle("medium")}`}
-                  style={{
-                    borderRadius: `${advancedSettings.frameCorners}px`,
-                    border: advancedSettings.border
-                      ? `${advancedSettings.borderWidth}px solid ${advancedSettings.borderColor}`
-                      : "none",
-                    boxShadow: `0 ${advancedSettings.windowShadow}px ${
-                      advancedSettings.windowShadow * 2
-                    }px rgba(0,0,0,0.3)`,
-                  }}
-                >
-                  {advancedSettings.windowHeader !== "none" && (
-                    <div
-                      className={`h-8 flex items-center px-4 ${
-                        advancedSettings.windowHeader === "dark"
-                          ? "bg-gray-800"
-                          : "bg-gray-100"
-                      }`}
-                      style={{
-                        borderTopLeftRadius: `${advancedSettings.frameCorners}px`,
-                        borderTopRightRadius: `${advancedSettings.frameCorners}px`,
-                      }}
-                    >
-                      <div className="flex space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="relative overflow-hidden">
-                    {!isCropping && (
-                      <div
-                        className="flex items-center justify-center"
-                        style={{
-                          transform: fitToImage
-                            ? "none"
-                            : `scale(${
-                                imageScale / 100
-                              }) translate(${imageHorizontalOffset}%, ${imageVerticalOffset}%)`,
-                          transition: "transform 0.2s ease-out",
-                        }}
-                      >
-                        <img
-                          src={uploadedImage || "/placeholder.svg"}
-                          alt="Uploaded screenshot"
-                          className={
-                            fitToImage
-                              ? "w-full h-full object-contain"
-                              : "max-w-full max-h-full"
-                          }
-                          style={{
-                            borderRadius: fitToImage
-                              ? advancedSettings.windowHeader !== "none"
-                                ? `0 0 ${advancedSettings.frameCorners}px ${advancedSettings.frameCorners}px`
-                                : `${advancedSettings.frameCorners}px`
-                              : `${imageCornerRadius}px`,
-                            transition: "all 0.2s ease-out",
-                          }}
-                        />
-                      </div>
-                    )}
+  return (
+    <main
+      id="workspace"
+      tabIndex={-1}
+      className={`workspace ${e.isDragging ? "dragging" : ""}`}
+    >
+      <div className="workspace-bar">
+        <div>
+          <span className="status-dot" />
+          <span>
+            {e.uploadedImage ? "Live preview" : "Your creative space"}
+          </span>
+        </div>
+        <span>
+          {e.uploadedImage
+            ? `${e.canvasSize.width} × ${e.canvasSize.height} px`
+            : "A little polish goes a long way."}
+        </span>
+      </div>
+      <div className="canvas-viewport" ref={viewportRef}>
+        {!e.uploadedImage ? (
+          <div className="empty-state">
+            <div className="empty-composition" aria-hidden="true">
+              <div className="empty-swatch swatch-back" />
+              <div className="empty-swatch swatch-front">
+                <div className="sample-browser">
+                  <div className="sample-browser-top">
+                    <i />
+                    <i />
+                    <i />
                   </div>
+                  <img src="/demo-screenshot.svg" alt="" />
                 </div>
               </div>
+              <div className="composition-label">
+                <Sparkle /> A better first impression
+              </div>
             </div>
-
-            {/* Text overlays positioned relative to the entire canvas */}
-            {!isCropping &&
-              textOverlays.map((overlay) => (
+            <span className="eyebrow">SMALL DETAILS. BIG DIFFERENCE.</span>
+            <h2>
+              Your screenshot.
+              <br />
+              <span>Ready for the spotlight.</span>
+            </h2>
+            <p>
+              Turn everyday screenshots into something
+              <br className="desktop-break" /> worth sharing. Drop an image to
+              get started.
+            </p>
+            <div className="empty-actions">
+              <button
+                className="primary-button"
+                disabled={e.isImporting}
+                onClick={e.addMoreScreenshots}
+              >
+                <Upload size={16} />
+                {e.isImporting ? "Opening image…" : "Upload screenshot"}
+              </button>
+              <button
+                className="text-button"
+                disabled={e.isImporting}
+                onClick={e.loadDemo}
+              >
+                Try a demo <ArrowUpRight size={15} />
+              </button>
+            </div>
+            <div className="upload-note">
+              PNG, JPG, WebP & more <span>·</span> or paste with <kbd>⌘ V</kbd>
+            </div>
+          </div>
+        ) : e.isCropping ? (
+          <div className="crop-workspace">
+            <div className="crop-instructions">
+              <CropIcon /> Drag to adjust your selection
+            </div>
+            <ReactCrop
+              crop={e.cropArea}
+              onChange={(_, percent) => e.onCropChange(percent)}
+              minWidth={1}
+              minHeight={1}
+              keepSelection
+            >
+              <img
+                src={e.uploadedImage}
+                alt="Crop selection"
+                style={{
+                  maxWidth: Math.max(180, viewport.width - 80),
+                  maxHeight: Math.max(160, viewport.height - 160),
+                  objectFit: "contain",
+                }}
+              />
+            </ReactCrop>
+            <div className="crop-actions">
+              <button className="secondary-button" onClick={e.onCancelCrop}>
+                <X size={15} /> Cancel
+              </button>
+              <button className="primary-button" onClick={e.onApplyCrop}>
+                <Check size={15} /> Apply crop
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="canvas-scroll">
+            <div
+              className="scaled-canvas"
+              style={{
+                width: e.canvasSize.width * scale,
+                height: e.canvasSize.height * scale,
+              }}
+            >
+              <div
+                ref={e.canvasContainerRef}
+                data-testid="export-canvas"
+                className="artboard"
+                style={{
+                  width: e.canvasSize.width,
+                  height: e.canvasSize.height,
+                  borderRadius: e.canvasCorners,
+                  background: e.getBackgroundStyle(),
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left",
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+              >
+                {e.advancedSettings.backgroundNoise && (
+                  <div
+                    data-testid="grain-overlay"
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      backgroundImage: noise,
+                      opacity: 0.3,
+                      pointerEvents: "none",
+                    }}
+                  />
+                )}
                 <div
-                  key={overlay.id}
-                  className={`absolute text-${
-                    overlay.color
-                  } font-bold drop-shadow-lg ${
-                    overlay.size === "small"
-                      ? "text-sm"
-                      : overlay.size === "large"
-                      ? "text-2xl"
-                      : "text-lg"
-                  } ${
-                    overlay.position === "top"
-                      ? "top-4"
-                      : overlay.position === "bottom"
-                      ? "bottom-4"
-                      : "top-1/2 -translate-y-1/2"
-                  } ${
-                    overlay.position.includes("left")
-                      ? "left-4"
-                      : overlay.position.includes("right")
-                      ? "right-4"
-                      : "left-1/2 -translate-x-1/2"
-                  }`}
+                  data-testid="image-frame"
                   style={{
-                    margin: `${padding}px`,
+                    position: "absolute",
+                    left: "50%",
+                    top: "50%",
+                    width: imageWidth,
+                    height: imageHeight + header,
+                    boxSizing: "content-box",
+                    transform: `translate(-50%, -50%) translate(${(e.advancedSettings.horizontalOffset * e.canvasSize.width) / 100}px, ${(e.advancedSettings.verticalOffset * e.canvasSize.height) / 100}px) scale(${e.advancedSettings.windowScale / 100})`,
+                    borderRadius: e.advancedSettings.frameCorners,
+                    boxShadow: `0 ${e.advancedSettings.windowShadow / 2}px ${e.advancedSettings.windowShadow * 1.5}px -${e.advancedSettings.windowShadow / 6}px rgba(25,35,30,0.35)`,
+                    border: e.advancedSettings.border
+                      ? `${e.advancedSettings.borderWidth}px solid ${e.advancedSettings.borderColor}`
+                      : undefined,
+                    overflow: "hidden",
                   }}
                 >
-                  {overlay.text}
+                  {header > 0 && (
+                    <div
+                      data-testid="window-header"
+                      style={{
+                        height: header,
+                        background:
+                          e.advancedSettings.windowHeader === "dark"
+                            ? "#252c2a"
+                            : "#fafbf9",
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "0 14px",
+                        gap: 7,
+                      }}
+                    >
+                      {["#ed7970", "#e7c067", "#87bf8d"].map((color) => (
+                        <i
+                          key={color}
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: "50%",
+                            background: color,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <img
+                    data-testid="canvas-image"
+                    src={e.uploadedImage}
+                    alt="Your styled screenshot"
+                    width={imageWidth}
+                    height={imageHeight}
+                    style={{
+                      display: "block",
+                      width: imageWidth,
+                      height: imageHeight,
+                      maxWidth: "none",
+                      objectFit: "contain",
+                      borderRadius: e.imageCornerRadius,
+                      transform: `translate(${e.imageHorizontalOffset}px, ${e.imageVerticalOffset}px) scale(${e.imageScale / 100})`,
+                    }}
+                  />
                 </div>
-              ))}
-
-            {/* Magnifiers positioned relative to the entire canvas */}
-            {!isCropping &&
-              magnifiers.map((magnifier) => (
-                <div
-                  key={magnifier.id}
-                  className={`absolute border-4 ${
-                    magnifier.color === "blue"
-                      ? "border-blue-500"
-                      : magnifier.color === "red"
-                      ? "border-red-500"
-                      : magnifier.color === "green"
-                      ? "border-green-500"
-                      : "border-yellow-500"
-                  } ${
-                    magnifier.shape === "circle" ? "rounded-full" : "rounded-lg"
-                  } ${
-                    magnifier.style === "filled"
-                      ? "bg-white/20"
-                      : magnifier.style === "dashed"
-                      ? "border-dashed"
-                      : ""
-                  } ${
-                    magnifier.size === "small"
-                      ? "w-16 h-16"
-                      : magnifier.size === "large"
-                      ? "w-32 h-32"
-                      : "w-24 h-24"
-                  } ${
-                    magnifier.position === "top-left"
-                      ? "top-4 left-4"
-                      : magnifier.position === "top-right"
-                      ? "top-4 right-4"
-                      : magnifier.position === "bottom-left"
-                      ? "bottom-4 left-4"
-                      : magnifier.position === "bottom-right"
-                      ? "bottom-4 right-4"
-                      : "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                  }`}
-                  style={{
-                    margin: `${padding}px`,
-                  }}
-                />
-              ))}
+                {e.magnifiers.map((m) => {
+                  const size = Math.min(
+                    { small: 120, medium: 180, large: 260 }[m.size] ?? 180,
+                    e.canvasSize.width * 0.84,
+                    e.canvasSize.height * 0.84,
+                  );
+                  return (
+                    <div
+                      key={m.id}
+                      data-testid="magnifier"
+                      style={{
+                        ...layerPosition(m.position),
+                        width: size,
+                        height: size,
+                        borderRadius: m.shape === "circle" ? "50%" : 16,
+                        border: `4px ${m.style === "dashed" ? "dashed" : "solid"} ${m.color}`,
+                        backgroundColor: "white",
+                        backgroundImage: `url("${e.uploadedImage}")`,
+                        backgroundSize: `${imageWidth * (m.zoom ?? 2)}px ${imageHeight * (m.zoom ?? 2)}px`,
+                        backgroundPosition: `${m.x ?? 50}% ${m.y ?? 50}%`,
+                        backgroundRepeat: "no-repeat",
+                        boxShadow: "0 8px 24px #182b3040",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {m.style === "filled" && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            background: m.color,
+                            opacity: 0.16,
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+                {e.textOverlays.map((t) => (
+                  <TextLayer key={t.id} layer={t} canvas={e.canvasSize} />
+                ))}
+              </div>
+              <div className="artboard-label">
+                <span>{e.activeName}</span>
+                <span>
+                  {e.aspectRatio === "Auto" ? "Original ratio" : e.aspectRatio}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        {e.uploadedImage && !e.isCropping && (
+          <div className="zoom-toolbar">
+            <button
+              aria-label="Zoom out"
+              disabled={zoom <= 25}
+              onClick={() => setZoom(Math.max(25, zoom - 25))}
+            >
+              <Minus size={15} />
+            </button>
+            <span>{Math.round(scale * 100)}%</span>
+            <button
+              aria-label="Zoom in"
+              disabled={zoom >= 200}
+              onClick={() => setZoom(Math.min(200, zoom + 25))}
+            >
+              <Plus size={15} />
+            </button>
+            <i />
+            <button
+              className="fit-button"
+              onClick={() => setZoom(100)}
+              aria-label="Fit preview"
+            >
+              <Scan size={14} /> Fit
+            </button>
+          </div>
+        )}
+        {e.isDragging && (
+          <div className="drop-overlay">
+            <ImagePlus size={38} />
+            <strong>Drop your next screenshot here</strong>
           </div>
         )}
       </div>
-    </div>
+      <footer className="filmstrip">
+        <div className="filmstrip-label">
+          <span>SCREENSHOTS</span>
+          <small>{e.screenshots.length} / 10</small>
+        </div>
+        <div className="filmstrip-items">
+          {e.screenshots.map((shot, i) => (
+            <div
+              className={`filmstrip-item ${shot.id === e.activeScreenshot ? "active" : ""}`}
+              key={shot.id}
+            >
+              <button
+                className="screenshot-button"
+                aria-label={`Select ${shot.name}`}
+                aria-pressed={shot.id === e.activeScreenshot}
+                onClick={() => e.switchToScreenshot(shot.id)}
+              >
+                <img src={shot.image} alt="" />
+                <span>{String(i + 1).padStart(2, "0")}</span>
+              </button>
+              <button
+                className="remove-screenshot"
+                aria-label={`Remove ${shot.name}`}
+                onClick={() => e.removeScreenshot(shot.id)}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+          <button
+            className="add-screenshot"
+            aria-label="Add screenshots"
+            disabled={!e.canAddMore || e.isImporting}
+            onClick={e.addMoreScreenshots}
+          >
+            <Plus size={20} />
+          </button>
+          {!e.screenshots.length && (
+            <p>
+              Your images live here.
+              <br />
+              <span>Keep up to 10 in your workspace.</span>
+            </p>
+          )}
+        </div>
+        <span className="session-note">This session only</span>
+      </footer>
+    </main>
   );
-};
+}
+function Sparkle() {
+  return <span>✧</span>;
+}
+function CropIcon() {
+  return <Scan size={15} />;
+}

@@ -7,6 +7,9 @@ export interface TextOverlay {
 }
 
 export interface Magnifier {
+  zoom?: number;
+  x?: number;
+  y?: number;
   id: string;
   shape: string;
   style: string;
@@ -29,6 +32,7 @@ export interface AdvancedSettings {
 }
 
 export interface EditorState {
+  backgroundCss?: string;
   selectedBackground: string;
   selectedShadow: string;
   textOverlays: TextOverlay[];

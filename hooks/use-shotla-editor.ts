@@ -1,952 +1,712 @@
-import { useCallback, useRef, useState, useEffect } from "react";
+"use client";
+
+import { toCanvas } from "html-to-image";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { backgroundThemes } from "@/constants/backgrounds";
-import { toPng } from "html-to-image";
+import {
+  applyPreset,
+  backgroundStyle,
+  canvasDimensions,
+  clamp,
+  cropPixels,
+  editHistory,
+  freshSettings,
+  type History,
+  MAX_DIMENSION,
+  MAX_IMAGES,
+  type presets,
+  redoHistory,
+  type Snapshot,
+  undoHistory,
+} from "@/lib/editor-model";
 import type {
   AdvancedSettings,
-  CropArea,
-  Magnifier,
-  Screenshot,
-  TextOverlay,
-  EditorState,
   AutoStyleResponse,
+  CropArea,
+  EditorState,
+  Magnifier,
+  TextOverlay,
 } from "@/types";
+
+type Document = { id: string; name: string; history: History };
+type SavedStyle = { id: string; name: string; settings: EditorState };
+const readImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("This image could not be opened."));
+    img.src = src;
+  });
+const readFile = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("This file could not be read."));
+    reader.readAsDataURL(file);
+  });
 
 export function useShotlaEditor() {
   const { toast } = useToast();
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [selectedBackground, setSelectedBackground] = useState("sunshine");
-  const [selectedShadow, setSelectedShadow] = useState("none");
-  const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
-  const [magnifiers, setMagnifiers] = useState<Magnifier[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [activeScreenshot, setActiveScreenshot] = useState<string | null>(null);
-  const [isAutoStyling, setIsAutoStyling] = useState(false);
-
+  const [emptySettings, setEmptySettings] = useState(freshSettings);
+  const [isDragging, setIsDragging] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
-  const [cropArea, setCropArea] = useState<CropArea | null>(null);
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
-
-  const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>({
-    backgroundNoise: false,
-    windowShadow: 50,
-    windowHeader: "dark",
-    frameCorners: 20,
-    windowScale: 100,
-    horizontalOffset: 0,
-    verticalOffset: 0,
-    border: false,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
+  const [cropArea, setCropArea] = useState<CropArea>({
+    unit: "%",
+    x: 10,
+    y: 10,
+    width: 80,
+    height: 80,
   });
-
-  // Canvas controls state
-  const [fitToImage, setFitToImage] = useState(true);
-  const [canvasSize, setCanvasSize] = useState({ width: 918, height: 328 });
-  const [canvasScale, setCanvasScale] = useState(100);
-  const [aspectRatio, setAspectRatio] = useState("Auto");
-  const [padding, setPadding] = useState(64);
-  const [canvasCorners, setCanvasCorners] = useState(8);
-
-  const [imageScale, setImageScale] = useState(100);
-  const [imageHorizontalOffset, setImageHorizontalOffset] = useState(0);
-  const [imageVerticalOffset, setImageVerticalOffset] = useState(0);
-  const [imageCornerRadius, setImageCornerRadius] = useState(0);
-  const [dynamicStyles, setDynamicStyles] = useState<Record<string, string>>(
-    {}
+  const [isExporting, setIsExporting] = useState(false);
+  const [isAutoStyling, setIsAutoStyling] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
+  const [exportFormat, setExportFormat] = useState("png");
+  const [exportScale, setExportScale] = useState(2);
+  const [exportName, setExportName] = useState("shotla-export");
+  const [lastExport, setLastExport] = useState<{
+    url: string;
+    name: string;
+    width: number;
+    height: number;
+    format: string;
+  } | null>(null);
+  const [savedStyles, setSavedStyles] = useState<SavedStyle[]>([]);
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const importLock = useRef(false);
+  const active = documents.find((d) => d.id === activeScreenshot);
+  const snapshot = active?.history.present;
+  const settings = snapshot?.settings ?? emptySettings;
+  const uploadedImage = snapshot?.image ?? null;
+  const imageSize = snapshot?.imageSize ?? { width: 1000, height: 660 };
+  const canvasSize = canvasDimensions(settings, imageSize);
+  useEffect(
+    () => () => {
+      if (lastExport) URL.revokeObjectURL(lastExport.url);
+    },
+    [lastExport],
   );
 
-  const MAX_SCREENSHOTS = 10;
-  const canAddMore = screenshots.length < MAX_SCREENSHOTS;
-
-  const computeFitCanvasSize = useCallback((imgW: number, imgH: number) => {
-    const SIDEBAR_WIDTH = 320; // w-80
-    const VERTICAL_CHROME = 200; // header/footer breathing room
-    const HORIZONTAL_GUTTER = 80; // padding around canvas area
-
-    const maxW = Math.max(
-      320,
-      (typeof window !== "undefined" ? window.innerWidth : 1280) -
-        SIDEBAR_WIDTH -
-        HORIZONTAL_GUTTER
+  const notice = useCallback(
+    (title: string, description?: string, error = false) =>
+      toast({ title, description, variant: error ? "destructive" : "default" }),
+    [toast],
+  );
+  const changeSnapshot = useCallback(
+    (change: (s: Snapshot) => Snapshot) => {
+      setDocuments((docs) =>
+        docs.map((d) =>
+          d.id === activeScreenshot
+            ? {
+                ...d,
+                history: editHistory(d.history, change(d.history.present)),
+              }
+            : d,
+        ),
+      );
+    },
+    [activeScreenshot],
+  );
+  const change = useCallback(
+    (update: Partial<EditorState> | ((s: EditorState) => EditorState)) => {
+      const run = (s: EditorState) =>
+        typeof update === "function" ? update(s) : { ...s, ...update };
+      if (!activeScreenshot) setEmptySettings(run);
+      else changeSnapshot((s) => ({ ...s, settings: run(s.settings) }));
+    },
+    [activeScreenshot, changeSnapshot],
+  );
+  const undo = useCallback(() => {
+    setIsCropping(false);
+    setDocuments((docs) =>
+      docs.map((d) =>
+        d.id === activeScreenshot
+          ? { ...d, history: undoHistory(d.history) }
+          : d,
+      ),
     );
-    const maxH = Math.max(
-      200,
-      (typeof window !== "undefined" ? window.innerHeight : 800) -
-        VERTICAL_CHROME
+  }, [activeScreenshot]);
+  const redo = useCallback(() => {
+    setIsCropping(false);
+    setDocuments((docs) =>
+      docs.map((d) =>
+        d.id === activeScreenshot
+          ? { ...d, history: redoHistory(d.history) }
+          : d,
+      ),
     );
+  }, [activeScreenshot]);
 
-    const imgAspect = imgW / imgH;
-    const boxAspect = maxW / maxH;
-
-    if (imgAspect > boxAspect) {
-      // limit by width
-      const width = Math.floor(maxW);
-      const height = Math.floor(width / imgAspect);
-      return { width, height };
-    } else {
-      // limit by height
-      const height = Math.floor(maxH);
-      const width = Math.floor(height * imgAspect);
-      return { width, height };
-    }
-  }, []);
-
-  // Recompute canvas size when image changes or window resizes if fitToImage is enabled
   useEffect(() => {
-    if (!uploadedImage || !fitToImage) return;
-
-    let isCancelled = false;
-    const img = new Image();
-    img.onload = () => {
-      if (isCancelled) return;
-      const { width, height } = computeFitCanvasSize(
-        img.naturalWidth,
-        img.naturalHeight
-      );
-      setCanvasSize({ width, height });
-    };
-    img.src = uploadedImage;
-
-    const onResize = () => {
-      if (!uploadedImage || !fitToImage) return;
-      const recompute = () => {
-        const { width, height } = computeFitCanvasSize(
-          img.naturalWidth,
-          img.naturalHeight
+    try {
+      const stored = JSON.parse(localStorage.getItem("shotla-styles") || "[]");
+      if (Array.isArray(stored))
+        setSavedStyles(
+          stored
+            .filter(
+              (s) => typeof s.name === "string" && s.settings?.advancedSettings,
+            )
+            .slice(0, 8)
+            .map((s) => ({ ...s, id: s.id || crypto.randomUUID() })),
         );
-        setCanvasSize({ width, height });
-      };
-      // If natural sizes not yet ready, re-create image
-      if (!img.naturalWidth || !img.naturalHeight) {
-        const probe = new Image();
-        probe.onload = () => {
-          const { width, height } = computeFitCanvasSize(
-            probe.naturalWidth,
-            probe.naturalHeight
-          );
-          setCanvasSize({ width, height });
-        };
-        probe.src = uploadedImage;
-      } else {
-        recompute();
-      }
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", onResize);
+    } catch {
+      /* Storage is optional. */
     }
-
-    return () => {
-      isCancelled = true;
-      if (typeof window !== "undefined") {
-        window.removeEventListener("resize", onResize);
-      }
-    };
-  }, [uploadedImage, fitToImage, computeFitCanvasSize]);
-
-  const captureEditorState = useCallback(
-    (): EditorState => ({
-      selectedBackground,
-      selectedShadow,
-      textOverlays,
-      magnifiers,
-      advancedSettings,
-      isCropping,
-      cropArea,
-      fitToImage,
-      canvasSize,
-      canvasScale,
-      aspectRatio,
-      padding,
-      canvasCorners,
-      imageScale,
-      imageHorizontalOffset,
-      imageVerticalOffset,
-      imageCornerRadius,
-    }),
-    [
-      selectedBackground,
-      selectedShadow,
-      textOverlays,
-      magnifiers,
-      advancedSettings,
-      isCropping,
-      cropArea,
-      fitToImage,
-      canvasSize,
-      canvasScale,
-      aspectRatio,
-      padding,
-      canvasCorners,
-      imageScale,
-      imageHorizontalOffset,
-      imageVerticalOffset,
-      imageCornerRadius,
-    ]
-  );
-
-  const applyEditorState = useCallback((state: EditorState | undefined) => {
-    if (!state) return;
-    setSelectedBackground(state.selectedBackground);
-    setSelectedShadow(state.selectedShadow);
-    setTextOverlays(state.textOverlays);
-    setMagnifiers(state.magnifiers);
-    setAdvancedSettings(state.advancedSettings);
-    setIsCropping(state.isCropping);
-    setCropArea(state.cropArea);
-    setFitToImage(state.fitToImage);
-    setCanvasSize(state.canvasSize);
-    setCanvasScale(state.canvasScale);
-    setAspectRatio(state.aspectRatio);
-    setPadding(state.padding);
-    setCanvasCorners(state.canvasCorners);
-    setImageScale(state.imageScale);
-    setImageHorizontalOffset(state.imageHorizontalOffset);
-    setImageVerticalOffset(state.imageVerticalOffset);
-    setImageCornerRadius(state.imageCornerRadius);
+    fetch("/api/auto-style")
+      .then((r) => r.json())
+      .then((d) => setAiAvailable(d.available === true))
+      .catch(() => {});
   }, []);
 
-  const updateAdvancedSetting = useCallback(
-    (key: keyof AdvancedSettings, value: any) => {
-      setAdvancedSettings((prev) => ({ ...prev, [key]: value }));
-    },
-    []
-  );
-
-  const resetImageControls = useCallback(() => {
-    setImageScale(100);
-    setImageHorizontalOffset(0);
-    setImageVerticalOffset(0);
-    setImageCornerRadius(0);
-  }, []);
-
-  const getBackgroundStyle = useCallback(
-    (background: string): { type: "css" | "tailwind"; value: string } => {
-      // Check for dynamic AI-generated styles first
-      if (dynamicStyles[background]) {
-        return {
-          type: "css",
-          value: dynamicStyles[background],
-        };
-      }
-
-      // Search through all background theme categories for the selected background
-      const allThemes = [
-        ...backgroundThemes.shapePatterns,
-        ...backgroundThemes.minimalGradients,
-        ...backgroundThemes.spotlightDark,
-        ...backgroundThemes.geometricPatterns,
-        ...backgroundThemes.meshBlobs,
-        ...backgroundThemes.abstractBubbles,
-        ...backgroundThemes.textures,
-      ];
-
-      const theme = allThemes.find((t) => t.value === background);
-
-      if (theme && theme.css) {
-        // Handle special spotlight backgrounds
-        if (
-          "type" in theme &&
-          theme.type === "spotlight" &&
-          "glowColor" in theme &&
-          theme.glowColor
-        ) {
-          return {
-            type: "css",
-            value: `${theme.css}; background-image: radial-gradient(circle at 50% 50%, ${theme.glowColor}33 0%, transparent 50%)`,
-          };
+  const importFiles = useCallback(
+    async (files: File[]) => {
+      if (importLock.current) return;
+      importLock.current = true;
+      setIsImporting(true);
+      try {
+        const available = MAX_IMAGES - documents.length;
+        if (!available) {
+          notice(
+            "Your workspace is full",
+            "Remove an image to add another. You can keep up to 10 images.",
+          );
+          return;
         }
-
-        return {
-          type: "css",
-          value: theme.css,
-        };
-      }
-
-      // Fallback to legacy styles for backward compatibility
-      const legacyStyles: Record<string, string> = {
-        "abstract-teal": "bg-gradient-to-br from-teal-400 to-cyan-600",
-        "abstract-orange": "bg-gradient-to-br from-orange-500 to-red-600",
-        "alternative-white": "bg-white",
-        "bermuda-red": "bg-gradient-to-br from-red-500 to-pink-600",
-        "bermuda-green": "bg-gradient-to-br from-green-500 to-emerald-600",
-        "bermuda-purple": "bg-gradient-to-br from-purple-600 to-pink-600",
-        none: "bg-gradient-to-br from-yellow-300 to-orange-400",
-      };
-
-      return {
-        type: "tailwind",
-        value: legacyStyles[background] || "bg-gray-100",
-      };
-    },
-    [dynamicStyles]
-  );
-
-  const getShadowStyle = useCallback((shadow: string) => {
-    const styles: Record<string, string> = {
-      none: "",
-      subtle: "drop-shadow-sm",
-      medium: "drop-shadow-lg",
-      strong: "drop-shadow-2xl",
-    };
-    return styles[shadow] || "";
-  }, []);
-
-  const pushScreenshot = useCallback(
-    (imageData: string, name: string): string | null => {
-      let createdId: string | null = null;
-      setScreenshots((prev) => {
-        if (prev.length >= MAX_SCREENSHOTS) return prev;
-        const newId =
-          Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        createdId = newId;
-        const freshState: EditorState = {
-          selectedBackground: "sunshine",
-          selectedShadow: "none",
-          textOverlays: [],
-          magnifiers: [],
-          advancedSettings: {
-            backgroundNoise: false,
-            windowShadow: 50,
-            windowHeader: "dark",
-            frameCorners: 20,
-            windowScale: 100,
-            horizontalOffset: 0,
-            verticalOffset: 0,
-            border: false,
-            borderWidth: 2,
-            borderColor: "#FFFFFF",
-          },
-          isCropping: false,
-          cropArea: null,
-          fitToImage: true,
-          canvasSize: { width: 918, height: 328 },
-          canvasScale: 100,
-          aspectRatio: "Auto",
-          padding: 64,
-          canvasCorners: 8,
-          imageScale: 100,
-          imageHorizontalOffset: 0,
-          imageVerticalOffset: 0,
-          imageCornerRadius: 0,
-        };
-        const next = [
-          ...prev,
-          {
-            id: newId,
-            image: imageData,
-            name,
-            createdAt: new Date(),
-            state: freshState,
-          },
-        ];
-        return next;
-      });
-      return createdId;
-    },
-    []
-  );
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      const files = Array.from(e.dataTransfer.files).slice(
-        0,
-        MAX_SCREENSHOTS - screenshots.length
-      );
-
-      files.forEach((file) => {
-        if (file.type.startsWith("image/")) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageData = e.target?.result as string;
-            const newId = pushScreenshot(imageData, file.name);
-            if (!activeScreenshot && newId) {
-              setActiveScreenshot(newId);
-              setUploadedImage(imageData);
-              setOriginalImage(imageData);
-              // Ensure new images get the default background
-              setSelectedBackground("sunshine");
-            }
-          };
-          reader.readAsDataURL(file);
-        }
-      });
-    },
-    [screenshots.length, activeScreenshot, pushScreenshot]
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []).slice(
-        0,
-        MAX_SCREENSHOTS - screenshots.length
-      );
-
-      files.forEach((file) => {
-        if (file.type.startsWith("image/")) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageData = e.target?.result as string;
-            const newId = pushScreenshot(imageData, file.name);
-            if (!activeScreenshot && newId) {
-              setActiveScreenshot(newId);
-              setUploadedImage(imageData);
-              setOriginalImage(imageData);
-              // Ensure new images get the default background
-              setSelectedBackground("sunshine");
-            }
-          };
-          reader.readAsDataURL(file);
-        }
-      });
-
-      if (e.target) {
-        e.target.value = "";
-      }
-    },
-    [screenshots.length, activeScreenshot, pushScreenshot]
-  );
-
-  const selectScreenshot = useCallback(
-    (id: string) => {
-      // Save current state into active screenshot
-      setScreenshots((prev) => {
-        const currentId = activeScreenshot;
-        if (!currentId) return prev;
-        const snapshot = captureEditorState();
-        return prev.map((s) =>
-          s.id === currentId ? { ...s, state: snapshot } : s
-        );
-      });
-
-      setActiveScreenshot(id);
-
-      // Load selected state
-      const selected = screenshots.find((s) => s.id === id);
-      if (selected) {
-        setUploadedImage(selected.image);
-        setOriginalImage(selected.image);
-        applyEditorState(selected.state);
-      }
-    },
-    [activeScreenshot, screenshots, captureEditorState, applyEditorState]
-  );
-
-  const removeScreenshot = useCallback(
-    (id: string) => {
-      setScreenshots((prev) => {
-        const updated = prev.filter((s) => s.id !== id);
-        if (activeScreenshot === id) {
-          if (updated.length > 0) {
-            const next = updated[0];
-            setActiveScreenshot(next.id);
-            setUploadedImage(next.image);
-            setOriginalImage(next.image);
-            applyEditorState(next.state);
-          } else {
-            setActiveScreenshot(null);
-            setUploadedImage(null);
-            setOriginalImage(null);
-            // reset editor state to defaults
-            applyEditorState(undefined);
+        const added: Document[] = [];
+        for (const file of files.slice(0, available)) {
+          try {
+            if (!/^image\/(png|jpeg|webp|gif|avif)$/.test(file.type))
+              throw new Error("Use a PNG, JPG, WebP, GIF, or AVIF image.");
+            if (file.size > 20 * 1024 * 1024)
+              throw new Error("Choose an image smaller than 20 MB.");
+            const src = await readFile(file);
+            const img = await readImage(src);
+            if (img.naturalWidth * img.naturalHeight > 40_000_000)
+              throw new Error(
+                "Choose an image with fewer than 40 million pixels.",
+              );
+            // Normalize formats (including animated images) into a single, exportable frame.
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            canvas.getContext("2d")!.drawImage(img, 0, 0);
+            const image = canvas.toDataURL("image/png");
+            const present: Snapshot = {
+              image,
+              original: image,
+              imageSize: { width: img.naturalWidth, height: img.naturalHeight },
+              settings: structuredClone(emptySettings),
+            };
+            added.push({
+              id: crypto.randomUUID(),
+              name: file.name,
+              history: { past: [], present, future: [] },
+            });
+          } catch (error) {
+            notice(
+              `Couldn't open ${file.name}`,
+              error instanceof Error ? error.message : "Try another image.",
+              true,
+            );
           }
         }
-        return updated;
-      });
-    },
-    [activeScreenshot, applyEditorState]
-  );
-
-  const addMoreScreenshots = useCallback(() => {
-    if (!canAddMore) return;
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  }, [canAddMore]);
-
-  const switchToScreenshot = useCallback(
-    (id: string) => {
-      selectScreenshot(id);
-    },
-    [selectScreenshot]
-  );
-
-  const updateActiveScreenshotImage = useCallback(
-    (newImage: string) => {
-      if (!activeScreenshot) return;
-      setScreenshots((prev) =>
-        prev.map((s) =>
-          s.id === activeScreenshot ? { ...s, image: newImage } : s
-        )
-      );
-    },
-    [activeScreenshot]
-  );
-
-  const handleApplyCrop = useCallback(() => {
-    if (!uploadedImage || !cropArea || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const scaleX = img.naturalWidth / 100;
-      const scaleY = img.naturalHeight / 100;
-
-      const actualCrop = {
-        x: cropArea.x * scaleX,
-        y: cropArea.y * scaleY,
-        width: cropArea.width * scaleX,
-        height: cropArea.height * scaleY,
-      };
-
-      canvas.width = actualCrop.width;
-      canvas.height = actualCrop.height;
-
-      ctx.drawImage(
-        img,
-        actualCrop.x,
-        actualCrop.y,
-        actualCrop.width,
-        actualCrop.height,
-        0,
-        0,
-        actualCrop.width,
-        actualCrop.height
-      );
-
-      const croppedImageData = canvas.toDataURL("image/png", 1.0);
-      setUploadedImage(croppedImageData);
-      updateActiveScreenshotImage(croppedImageData);
-
-      setIsCropping(false);
-      setCropArea(null);
-
-      if (fitToImage) {
-        setCanvasSize({ width: actualCrop.width, height: actualCrop.height });
-      }
-    };
-    img.src = uploadedImage;
-  }, [uploadedImage, cropArea, fitToImage, updateActiveScreenshotImage]);
-
-  const handleStartCrop = useCallback(() => {
-    setIsCropping(true);
-    setCropArea({ unit: "px", x: 20, y: 20, width: 200, height: 150 });
-  }, []);
-
-  const handleCropChange = useCallback((crop: CropArea) => {
-    setCropArea(crop);
-  }, []);
-
-  const handleCancelCrop = useCallback(() => {
-    setIsCropping(false);
-    setCropArea(null);
-  }, []);
-
-  const handleCropDoubleClick = useCallback(() => {
-    handleApplyCrop();
-  }, [handleApplyCrop]);
-
-  const addMagnifier = useCallback(() => {
-    const magnifier: Magnifier = {
-      id: Date.now().toString(),
-      shape: "circle",
-      style: "outline",
-      position: "center",
-      size: "medium",
-      color: "blue",
-    };
-    setMagnifiers((prev) => [...prev, magnifier]);
-  }, []);
-
-  const addTextLayer = useCallback(() => {
-    const overlay: TextOverlay = {
-      id: Date.now().toString(),
-      text: "Sample Text",
-      position: "center",
-      size: "medium",
-      color: "white",
-    };
-    setTextOverlays((prev) => [...prev, overlay]);
-  }, []);
-
-  const exportImage = useCallback(async () => {
-    if (!uploadedImage || !canvasContainerRef.current) {
-      toast({
-        title: "Export Failed",
-        description: "No image or canvas found to export",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      toast({
-        title: "🎨 Generating Export...",
-        description: "Capturing your styled screenshot",
-      });
-
-      // Use html-to-image to capture the entire styled canvas including CSS backgrounds, shadows, frames
-      const dataUrl = await toPng(canvasContainerRef.current, {
-        cacheBust: true,
-        quality: 1.0,
-        pixelRatio: 2, // High DPI for crisp output
-        style: {
-          // Ensure the export captures the element properly
-          transform: "scale(1)",
-          transformOrigin: "top left",
-        },
-        filter: (node) => {
-          // Filter out any drag overlay or crop tools that shouldn't be in the export
-          const excludeClasses = [
-            "crop-overlay",
-            "drag-overlay",
-            "magnifier-tooltip",
-          ];
-          return !excludeClasses.some(
-            (className) => node.classList && node.classList.contains(className)
+        if (added.length) {
+          setDocuments((docs) => [...docs, ...added].slice(0, MAX_IMAGES));
+          setActiveScreenshot(added[0].id);
+          setIsCropping(false);
+        }
+        if (files.length > available)
+          notice(
+            "Image limit reached",
+            `Only the first ${available} files were considered. The workspace holds 10 images.`,
           );
-        },
-      });
+      } finally {
+        importLock.current = false;
+        setIsImporting(false);
+      }
+    },
+    [documents.length, emptySettings, notice],
+  );
 
-      // Create download link
-      const link = document.createElement("a");
-      link.download = `shotla-export-${new Date()
-        .toISOString()
-        .slice(0, 10)}.png`;
-      link.href = dataUrl;
-      link.click();
-
-      toast({
-        title: "✨ Export Complete!",
-        description: "Your styled screenshot has been downloaded",
-      });
-    } catch (error) {
-      console.error("Export failed:", error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to generate the image. Please try again.",
-        variant: "destructive",
-      });
+  const loadDemo = async () => {
+    try {
+      const response = await fetch("/demo-screenshot.svg");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      try {
+        const img = await readImage(url);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0);
+        const png = await new Promise<Blob | null>((r) => canvas.toBlob(r));
+        if (png)
+          await importFiles([
+            new File([png], "Studio overview.png", { type: "image/png" }),
+          ]);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      notice(
+        "Demo could not load",
+        "You can still upload your own image.",
+        true,
+      );
     }
-  }, [uploadedImage, toast]);
+  };
 
-  const autoStyleWithAI = useCallback(async () => {
-    if (!uploadedImage) {
-      toast({
-        title: "No Image",
-        description: "Please upload an image first to use Auto-Style with AI.",
-        variant: "destructive",
-      });
+  useEffect(() => {
+    const isInput = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      (target.matches("input, textarea, select") || target.isContentEditable);
+    const paste = (e: ClipboardEvent) => {
+      if (isInput(e.target)) return;
+      const files = Array.from(e.clipboardData?.files || []);
+      if (files.length) {
+        e.preventDefault();
+        void importFiles(files);
+      }
+    };
+    const keydown = (e: KeyboardEvent) => {
+      if (isInput(e.target)) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        e.shiftKey ? redo() : undo();
+      }
+      if (e.key === "Escape") setIsCropping(false);
+    };
+    window.addEventListener("paste", paste);
+    window.addEventListener("keydown", keydown);
+    return () => {
+      window.removeEventListener("paste", paste);
+      window.removeEventListener("keydown", keydown);
+    };
+  }, [importFiles, undo, redo]);
+
+  const updateAdvancedSetting = <K extends keyof AdvancedSettings>(
+    key: K,
+    value: AdvancedSettings[K],
+  ) =>
+    change((s) => ({
+      ...s,
+      advancedSettings: { ...s.advancedSettings, [key]: value },
+    }));
+  const setAspectRatio = (ratio: string) => {
+    if (ratio === "Auto") {
+      change({ aspectRatio: ratio, fitToImage: true });
       return;
     }
-
-    setIsAutoStyling(true);
-
+    const [w, h] = ratio.split(":").map(Number);
+    change({
+      aspectRatio: ratio,
+      fitToImage: false,
+      canvasSize: { width: 1200, height: Math.round((1200 * h) / w) },
+    });
+  };
+  const onApplyCrop = async () => {
+    if (!snapshot || cropArea.width <= 0 || cropArea.height <= 0) return;
     try {
-      // Create comprehensive system prompt with current editor context
-      const systemPrompt = `You are a world-class visual designer, known for creating vibrant, exciting, and colorful digital art. Your task is to analyze the provided screenshot and devise a visually stunning and dynamic style for it.
+      const img = await readImage(snapshot.image);
+      const crop = cropPixels(cropArea, snapshot.imageSize);
+      const canvas = document.createElement("canvas");
+      canvas.width = crop.width;
+      canvas.height = crop.height;
+      canvas
+        .getContext("2d")!
+        .drawImage(
+          img,
+          crop.x,
+          crop.y,
+          crop.width,
+          crop.height,
+          0,
+          0,
+          crop.width,
+          crop.height,
+        );
+      const image = canvas.toDataURL("image/png");
+      changeSnapshot((s) => ({
+        ...s,
+        image,
+        imageSize: { width: crop.width, height: crop.height },
+      }));
+      setIsCropping(false);
+    } catch {
+      notice("Crop failed", "Try selecting the crop area again.", true);
+    }
+  };
+  const restoreOriginal = async () => {
+    if (!snapshot) return;
+    const img = await readImage(snapshot.original);
+    changeSnapshot((s) => ({
+      ...s,
+      image: s.original,
+      imageSize: { width: img.width, height: img.height },
+    }));
+    setIsCropping(false);
+  };
 
-Generate a complex, multi-layered CSS background property that incorporates:
-- Multiple gradient types: linear-gradient, radial-gradient, and conic-gradient
-- Vibrant and complementary color palettes
-- Creative positioning and blending
-- Modern, energetic, and artistic feel
-
-IMPORTANT: Return ONLY the CSS value for the background property, without the "background:" prefix. For example:
-"radial-gradient(circle at 30% 30%, #ffcc00, transparent 25%), linear-gradient(135deg, #ff6699, #6699ff)"
-
-CURRENT EDITOR STATE:
-- Background: ${selectedBackground}
-- Shadow: ${selectedShadow}
-- Padding: ${padding}px
-- Canvas corners: ${canvasCorners}px
-- Frame corners: ${advancedSettings.frameCorners}px
-- Window shadow: ${advancedSettings.windowShadow}
-- Window header: ${advancedSettings.windowHeader}
-- Border: ${
-        advancedSettings.border
-          ? `enabled (${advancedSettings.borderColor})`
-          : "disabled"
+  const exportImage = async (clipboard = false) => {
+    if (
+      !uploadedImage ||
+      !canvasContainerRef.current ||
+      isExporting ||
+      isCropping
+    )
+      return;
+    setIsExporting(true);
+    try {
+      await document.fonts.ready;
+      const scale = Math.min(
+        exportScale,
+        8192 / Math.max(canvasSize.width, canvasSize.height),
+      );
+      const canvas = await toCanvas(canvasContainerRef.current, {
+        pixelRatio: scale,
+        width: canvasSize.width,
+        height: canvasSize.height,
+        skipFonts: true,
+        backgroundColor:
+          !clipboard && exportFormat === "jpeg" ? "#ffffff" : undefined,
+        style: { transform: "none" },
+        filter: (node) =>
+          !(
+            node instanceof Element && node.hasAttribute("data-export-exclude")
+          ),
+      });
+      const format = clipboard ? "png" : exportFormat;
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, `image/${format}`, 0.95),
+      );
+      if (!blob) throw new Error("The browser could not render this image.");
+      if (clipboard) {
+        if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined")
+          throw new Error(
+            "Clipboard is unavailable in this browser. Download your image instead.",
+          );
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob }),
+        ]);
+        notice("Copied to clipboard", "Your image is ready to paste.");
+      } else {
+        const url = URL.createObjectURL(blob);
+        const name = `${exportName.trim().replace(/[^\w .-]/g, "") || "shotla-export"}.${format === "jpeg" ? "jpg" : format}`;
+        setLastExport({
+          url,
+          name,
+          width: canvas.width,
+          height: canvas.height,
+          format,
+        });
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        notice(
+          "Your export is ready",
+          `${canvas.width} × ${canvas.height} px · ${format.toUpperCase()}`,
+        );
       }
-- Background noise: ${advancedSettings.backgroundNoise ? "enabled" : "disabled"}
-- Image scale: ${imageScale}%
-- Image positioning: ${imageHorizontalOffset}px horizontal, ${imageVerticalOffset}px vertical
-- Image corners: ${imageCornerRadius}px
-- Text overlays: ${textOverlays.length} active
-- Magnifiers: ${magnifiers.length} active
+    } catch (error) {
+      notice(
+        "Export could not finish",
+        error instanceof Error
+          ? error.message
+          : "Try again at a smaller export size.",
+        true,
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
-Create something completely different and more dynamic than the current style. Focus on:
-- Complex gradient combinations (3-5 layers)
-- Vibrant color palettes that complement the screenshot
-- Artistic patterns and visual interest
-- Modern, energetic aesthetic
-- Colors that work well with the screenshot content
-- Consider the existing visual elements and styling choices
-
-Avoid simple two-color gradients. Create something truly spectacular and unique that enhances the overall composition.
-
-Respond with a JSON object matching the schema.`;
-
-      // Create the comprehensive payload
-      const payload = {
-        contents: {
-          inlineData: {
-            mimeType: "image/jpeg",
-            data: uploadedImage.replace(/^data:image\/[a-z]+;base64,/, ""), // Remove data URL prefix
-          },
-          text: systemPrompt,
-        },
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                backgroundCss: {
-                  type: "STRING",
-                  description:
-                    "A complex, multi-layered CSS background property using linear-gradient, radial-gradient, and conic-gradient",
-                },
-                backgroundName: {
-                  type: "STRING",
-                  description: "A creative name for this background style",
-                },
-                description: {
-                  type: "STRING",
-                  description: "A brief description of the visual style",
-                },
-                canvasRadius: {
-                  type: "INTEGER",
-                  description: "Canvas corner radius (0-64)",
-                },
-                frameBorderRadius: {
-                  type: "INTEGER",
-                  description: "Window frame corner radius (0-64)",
-                },
-                padding: {
-                  type: "INTEGER",
-                  description: "Canvas padding (16-128)",
-                },
-                shadow: {
-                  type: "INTEGER",
-                  description: "Frame shadow intensity (0-100)",
-                },
-                windowHeaderStyle: {
-                  type: "STRING",
-                  enum: ["dark", "light", "none"],
-                  description: "Style of the macOS window header",
-                },
-                noise: {
-                  type: "BOOLEAN",
-                  description: "Apply a noise overlay",
-                },
-              },
-              required: [
-                "backgroundCss",
-                "backgroundName",
-                "description",
-                "canvasRadius",
-                "frameBorderRadius",
-                "padding",
-                "shadow",
-                "windowHeaderStyle",
-                "noise",
-              ],
-            },
-          },
-        },
-      };
-
+  const autoStyleWithAI = async () => {
+    if (!snapshot || !aiAvailable || isAutoStyling) return;
+    setIsAutoStyling(true);
+    try {
+      const img = await readImage(snapshot.image);
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(1, 1024 / Math.max(img.width, img.height));
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas
+        .getContext("2d")!
+        .drawImage(img, 0, 0, canvas.width, canvas.height);
       const response = await fetch("/api/auto-style", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: {
+            inlineData: {
+              mimeType: "image/png",
+              data: canvas.toDataURL("image/png").split(",")[1],
+            },
+          },
+        }),
       });
-
       const data: AutoStyleResponse = await response.json();
-
-      if (data.success && data.style) {
-        // Create a new dynamic background entry
-        const dynamicBackgroundKey = `ai-generated-${Date.now()}`;
-
-        // Store the AI-generated CSS style
-        setDynamicStyles((prev) => ({
-          ...prev,
-          [dynamicBackgroundKey]: data.style!.backgroundCss,
-        }));
-
-        // Update the selected background to use this new AI-generated style
-        setSelectedBackground(dynamicBackgroundKey);
-
-        // Apply additional AI-generated settings if provided
-        if (data.style.canvasRadius !== undefined) {
-          console.log(
-            `🎨 AI: Applying canvas radius: ${data.style.canvasRadius}`
-          );
-          setCanvasCorners(data.style.canvasRadius);
-        }
-        if (data.style.frameBorderRadius !== undefined) {
-          console.log(
-            `🎨 AI: Applying frame border radius: ${data.style.frameBorderRadius}`
-          );
-          updateAdvancedSetting("frameCorners", data.style.frameBorderRadius);
-        }
-        if (data.style.padding !== undefined) {
-          console.log(`🎨 AI: Applying padding: ${data.style.padding}`);
-          setPadding(data.style.padding);
-        }
-        if (data.style.shadow !== undefined) {
-          console.log(`🎨 AI: Applying shadow: ${data.style.shadow}`);
-          updateAdvancedSetting("windowShadow", data.style.shadow);
-        }
-        if (data.style.windowHeaderStyle !== undefined) {
-          console.log(
-            `🎨 AI: Applying window header style: ${data.style.windowHeaderStyle}`
-          );
-          updateAdvancedSetting("windowHeader", data.style.windowHeaderStyle);
-        }
-        if (data.style.noise !== undefined) {
-          console.log(`🎨 AI: Applying noise: ${data.style.noise}`);
-          updateAdvancedSetting("backgroundNoise", data.style.noise);
-        }
-
-        // Log the complete AI response for debugging
-        console.log("🎨 Complete AI Style Response:", data.style);
-
-        toast({
-          title: "🎨 AI Style Generated!",
-          description: `Applied "${data.style.backgroundName}": ${data.style.description}`,
-        });
-      } else {
-        toast({
-          title: "Style Generation Failed",
-          description:
-            data.error || "Failed to generate AI style. Please try again.",
-          variant: "destructive",
-        });
-      }
+      if (!response.ok || !data.style)
+        throw new Error(data.error || "Styling is temporarily unavailable.");
+      const style = data.style;
+      if (
+        !CSS.supports("background", style.backgroundCss) ||
+        /url\s*\(/i.test(style.backgroundCss)
+      )
+        throw new Error("The suggested background was invalid. Try again.");
+      change((s) => ({
+        ...s,
+        selectedBackground: "custom",
+        backgroundCss: style.backgroundCss,
+        padding: style.padding ?? s.padding,
+        canvasCorners: style.canvasRadius ?? s.canvasCorners,
+        advancedSettings: {
+          ...s.advancedSettings,
+          frameCorners: style.frameBorderRadius ?? 12,
+          windowShadow: style.shadow ?? 28,
+          windowHeader: style.windowHeaderStyle ?? "none",
+          backgroundNoise: style.noise ?? false,
+        },
+      }));
+      notice("AI style applied", style.description);
     } catch (error) {
-      toast({
-        title: "Connection Error",
-        description:
-          "Failed to connect to AI service. Please check your internet connection and try again.",
-        variant: "destructive",
-      });
+      notice(
+        "AI styling unavailable",
+        error instanceof Error ? error.message : "Try a studio preset instead.",
+        true,
+      );
     } finally {
       setIsAutoStyling(false);
     }
-  }, [
-    uploadedImage,
-    selectedBackground,
-    selectedShadow,
-    padding,
-    canvasCorners,
-    advancedSettings,
-    imageScale,
-    imageHorizontalOffset,
-    imageVerticalOffset,
-    imageCornerRadius,
-    textOverlays,
-    magnifiers,
-    setCanvasCorners,
-    updateAdvancedSetting,
-    setPadding,
-    toast,
-  ]);
+  };
+
+  const saveStyle = (name: string) => {
+    if (!name.trim()) return;
+    const style = {
+      ...settings,
+      textOverlays: [],
+      magnifiers: [],
+      isCropping: false,
+      cropArea: null,
+    };
+    const next = [
+      { id: crypto.randomUUID(), name: name.trim(), settings: style },
+      ...savedStyles,
+    ].slice(0, 8);
+    try {
+      localStorage.setItem("shotla-styles", JSON.stringify(next));
+      setSavedStyles(next);
+      notice(
+        "Style saved",
+        "Available in this browser for your next screenshot.",
+      );
+    } catch {
+      notice(
+        "Style could not be saved",
+        "Browser storage is unavailable.",
+        true,
+      );
+    }
+  };
 
   return {
-    // state
+    ...settings,
+    canvasSize,
     uploadedImage,
-    selectedBackground,
-    selectedShadow,
-    textOverlays,
-    magnifiers,
-    advancedSettings,
+    imageSize,
     isDragging,
     isCropping,
     cropArea,
-    fitToImage,
-    canvasSize,
-    canvasScale,
-    aspectRatio,
-    padding,
-    canvasCorners,
-    imageScale,
-    imageHorizontalOffset,
-    imageVerticalOffset,
-    imageCornerRadius,
-    screenshots,
-    activeScreenshot,
-    canAddMore,
+    isExporting,
     isAutoStyling,
-
-    // refs
+    isImporting,
+    aiAvailable,
+    screenshots: documents.map((d) => ({
+      id: d.id,
+      name: d.name,
+      image: d.history.present.image,
+    })),
+    activeScreenshot,
+    activeName: active?.name ?? "Untitled screenshot",
+    canAddMore: documents.length < MAX_IMAGES,
+    canUndo: !!active?.history.past.length,
+    canRedo: !!active?.history.future.length,
+    undo,
+    redo,
     fileInputRef,
-    canvasRef,
     canvasContainerRef,
-
-    // updaters
-    setSelectedBackground,
+    previewZoom,
+    setPreviewZoom,
+    exportFormat,
+    setExportFormat,
+    exportScale,
+    setExportScale,
+    exportName,
+    setExportName,
+    lastExport,
+    savedStyles,
+    saveStyle,
+    applySavedStyle: (style: SavedStyle) =>
+      change((s) => ({
+        ...style.settings,
+        textOverlays: s.textOverlays,
+        magnifiers: s.magnifiers,
+      })),
+    deleteSavedStyle: (index: number) => {
+      const next = savedStyles.filter((_, i) => i !== index);
+      try {
+        localStorage.setItem("shotla-styles", JSON.stringify(next));
+        setSavedStyles(next);
+      } catch {
+        notice(
+          "Style could not be removed",
+          "Browser storage is unavailable.",
+          true,
+        );
+      }
+    },
+    applyPreset: (preset: (typeof presets)[number]) =>
+      change((s) => applyPreset(s, preset)),
+    setSelectedBackground: (selectedBackground: string) =>
+      change({ selectedBackground }),
+    setCustomBackground: (backgroundCss: string) =>
+      change({ selectedBackground: "custom", backgroundCss }),
+    getBackgroundStyle: () =>
+      backgroundStyle(settings.selectedBackground, settings.backgroundCss),
     updateAdvancedSetting,
-    setFitToImage,
-    setCanvasSize,
-    setCanvasScale: (s: number) => setCanvasScale(s),
-    setAspectRatio: (r: string) => setAspectRatio(r),
-    setPadding,
-    setCanvasCorners,
-    setImageScale,
-    setImageHorizontalOffset,
-    setImageVerticalOffset,
-    setImageCornerRadius,
-    setIsAutoStyling,
-
-    // actions
-    onDrop: handleDrop,
-    onDragOver: handleDragOver,
-    onDragLeave: handleDragLeave,
-    onFileSelect: handleFileSelect,
-
-    onStartCrop: handleStartCrop,
-    onApplyCrop: handleApplyCrop,
-    onCancelCrop: handleCancelCrop,
-    onCropChange: handleCropChange,
-    onCropDoubleClick: handleCropDoubleClick,
-
-    addMagnifier,
-    addTextLayer,
+    setAspectRatio,
+    setFitToImage: (fitToImage: boolean) =>
+      change({ fitToImage, aspectRatio: "Auto", canvasSize }),
+    setCanvasSize: (size: { width: number; height: number }) =>
+      change({
+        fitToImage: false,
+        aspectRatio: "Custom",
+        canvasSize: {
+          width: clamp(size.width, 100, MAX_DIMENSION),
+          height: clamp(size.height, 100, MAX_DIMENSION),
+        },
+      }),
+    setPadding: (padding: number) => change({ padding }),
+    setCanvasCorners: (canvasCorners: number) => change({ canvasCorners }),
+    setImageScale: (imageScale: number) => change({ imageScale }),
+    setImageHorizontalOffset: (imageHorizontalOffset: number) =>
+      change({ imageHorizontalOffset }),
+    setImageVerticalOffset: (imageVerticalOffset: number) =>
+      change({ imageVerticalOffset }),
+    setImageCornerRadius: (imageCornerRadius: number) =>
+      change({ imageCornerRadius }),
+    onResetImageControls: () =>
+      change({
+        imageScale: 100,
+        imageHorizontalOffset: 0,
+        imageVerticalOffset: 0,
+        imageCornerRadius: 0,
+      }),
+    resetStyle: () => change(freshSettings()),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      void importFiles(Array.from(e.dataTransfer.files));
+    },
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer.types.includes("Files")) setIsDragging(true);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node))
+        setIsDragging(false);
+    },
+    onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => {
+      void importFiles(Array.from(e.target.files || []));
+      e.target.value = "";
+    },
+    addMoreScreenshots: () => fileInputRef.current?.click(),
+    loadDemo,
+    switchToScreenshot: (id: string) => {
+      setActiveScreenshot(id);
+      setIsCropping(false);
+    },
+    removeScreenshot: (id: string) => {
+      setDocuments((docs) => docs.filter((d) => d.id !== id));
+      if (id === activeScreenshot) {
+        setActiveScreenshot(documents.find((d) => d.id !== id)?.id ?? null);
+        setIsCropping(false);
+      }
+    },
+    onStartCrop: () => {
+      if (uploadedImage) {
+        setCropArea({ unit: "%", x: 10, y: 10, width: 80, height: 80 });
+        setIsCropping(true);
+      }
+    },
+    onApplyCrop,
+    onCancelCrop: () => setIsCropping(false),
+    onCropChange: setCropArea,
+    restoreOriginal,
+    addTextLayer: () =>
+      change((s) => ({
+        ...s,
+        textOverlays: [
+          ...s.textOverlays,
+          {
+            id: crypto.randomUUID(),
+            text: "Your next big idea.",
+            position: "bottom",
+            size: "medium",
+            color: "#ffffff",
+          },
+        ],
+      })),
+    updateText: (id: string, patch: Partial<TextOverlay>) =>
+      change((s) => ({
+        ...s,
+        textOverlays: s.textOverlays.map((t) =>
+          t.id === id ? { ...t, ...patch } : t,
+        ),
+      })),
+    removeText: (id: string) =>
+      change((s) => ({
+        ...s,
+        textOverlays: s.textOverlays.filter((t) => t.id !== id),
+      })),
+    addMagnifier: () =>
+      change((s) => ({
+        ...s,
+        magnifiers: [
+          ...s.magnifiers,
+          {
+            id: crypto.randomUUID(),
+            shape: "circle",
+            style: "outline",
+            position: "center",
+            size: "medium",
+            color: "#ffffff",
+            zoom: 2,
+            x: 50,
+            y: 50,
+          },
+        ],
+      })),
+    updateMagnifier: (id: string, patch: Partial<Magnifier>) =>
+      change((s) => ({
+        ...s,
+        magnifiers: s.magnifiers.map((m) =>
+          m.id === id ? { ...m, ...patch } : m,
+        ),
+      })),
+    removeMagnifier: (id: string) =>
+      change((s) => ({
+        ...s,
+        magnifiers: s.magnifiers.filter((m) => m.id !== id),
+      })),
     exportImage,
     autoStyleWithAI,
-
-    addMoreScreenshots,
-    switchToScreenshot,
-    removeScreenshot,
-    onResetImageControls: resetImageControls,
-
-    // helpers
-    getBackgroundStyle,
-    getShadowStyle,
   };
 }
+export type ShotlaEditor = ReturnType<typeof useShotlaEditor>;
